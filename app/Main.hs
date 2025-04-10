@@ -2,32 +2,40 @@
 
 module Main where
 
-import           Api              (currentTurn, hullCargo, loadturnRst, login,
-                                   planetName, planetNativeType, shipAmmo,
-                                   shipClans, shipId, shipName)
-import           Calcs            (cargoUsed, getHull, myPlanets, myShips,
-                                   nativeType, potentialProduction, production,
-                                   resources, showPotentialResources,
-                                   totalResources)
-import           Control.Monad    (void)
-import           Optics.Operators ((^.))
-import           Text.Printf      (printf)
+import           Api                (currentTurn, hullCargo, loadturnRst, login,
+                                     planetName, planetNativeType, shipAmmo,
+                                     shipClans, shipId, shipName)
+import           Calcs              (cargoUsed, getHull, myPlanets, myShips,
+                                     nativeType, potentialProduction,
+                                     production, resources,
+                                     showPotentialResources, totalResources)
+import           Control.Monad      (void)
+import           Optics.Operators   ((^.))
+import           System.Environment (getArgs)
+import           System.IO.Error    (tryIOError)
+import           Text.Printf        (printf)
 
 -- Read from file, first line is username, second line is password
 readCredential :: IO (String, String)
 readCredential = do
-    contents <- readFile ".credential"
-    let (username:password:_) = lines contents
-    return (username, password)
+    credentials <- tryIOError $ readFile ".credential"
+    case credentials of
+        Left _ -> error message
+        Right contents -> case lines contents of
+            username : password : _ -> pure (username, password)
+            _                       -> error message
+    where message = "Expected 2 lines in a file named '.credential'. First line username, second line password."
 
 main :: IO ()
 main = do
-    let _testGameId = "643520"
-    let _cazSmallGameId = "643510"
-    let _cazBigGameId = "643598"
-    let _westGameId = "641474"
 
-    let gameid = _cazSmallGameId
+    -- My test games
+    -- Test game            = 643520
+    -- Sector 7777          = 643510
+    -- Lets try this thing  = 643598
+    -- Westville            = 641474
+
+    gameid <- head <$> getArgs
 
     (username, password) <- readCredential
     apikey <- login username password
