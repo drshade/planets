@@ -4,15 +4,11 @@ import           Data.Aeson                 (FromJSON,
                                              Options (fieldLabelModifier),
                                              decode, defaultOptions)
 import           Data.Aeson.TH              (deriveJSON)
-import qualified Data.ByteString.Char8      as Char8 (pack, unpack)
 import qualified Data.ByteString.Lazy.Char8 as LChar8 (pack, unpack)
 import           Data.Char                  (toLower)
-import           Data.Functor               (void)
 import           Network.HTTP.Client        (httpLbs, newManager, parseRequest,
-                                             requestHeaders, responseBody,
-                                             responseStatus)
+                                             responseBody, responseStatus)
 import           Network.HTTP.Client.TLS    (tlsManagerSettings)
-import           Network.HTTP.Types.Header  (hCookie)
 import           Network.HTTP.Types.Status  (statusCode)
 import           Optics                     (makeLenses, (^.))
 import           Prelude                    hiding (error)
@@ -59,6 +55,7 @@ data Ship = Ship
     , _shipMegaCredits :: Int
     , _shipHullId      :: Int
     , _shipEngineId    :: Int
+    , _shipAmmo        :: Int
     } deriving (Show)
 
 makeLenses ''Ship
@@ -178,7 +175,7 @@ fetch url = do
             P.error $ "Non-200 response returned... implement this! -> " ++ body
         else do
             let body :: String = LChar8.unpack $ responseBody resp
-            putStrLn $ "Response: " ++ body
+            -- putStrLn $ "Response: " ++ body
             -- First check if it's an error by decoding the response
             let errorResponse = decode (LChar8.pack body) :: Maybe ErrorResponse
             case errorResponse of

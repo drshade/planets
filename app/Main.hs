@@ -1,13 +1,14 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module Main where
 
-import           Api              (ApiKey, GameId, Planet, Planets, Ship,
-                                   currentTurn, hullCargo, loadturnRst, login,
-                                   planetName, planetNativeType, rstPlayer,
+import           Api              (currentTurn, hullCargo, loadturnRst, login,
+                                   planetName, planetNativeType, shipAmmo,
                                    shipClans, shipId, shipName)
-import           Calcs            (ResourceHolder, Resources, cargoUsed,
-                                   getHull, myPlanets, myShips, nativeType,
-                                   production, resources, totalResources)
+import           Calcs            (cargoUsed, getHull, myPlanets, myShips,
+                                   nativeType, potentialProduction, production,
+                                   resources, showPotentialResources,
+                                   totalResources)
 import           Control.Monad    (void)
 import           Optics.Operators ((^.))
 import           Text.Printf      (printf)
@@ -21,12 +22,16 @@ readCredential = do
 
 main :: IO ()
 main = do
-    let testGameId = "643520"
-    let cazGameId = "643510"
-    let westGameId = "641474"
+    let _testGameId = "643520"
+    let _cazSmallGameId = "643510"
+    let _cazBigGameId = "643598"
+    let _westGameId = "641474"
+
+    let gameid = _cazSmallGameId
+
     (username, password) <- readCredential
     apikey <- login username password
-    turn <- currentTurn apikey westGameId
+    turn <- currentTurn apikey gameid
     let myPlanets' = myPlanets $ turn ^. loadturnRst
     let myShips' = myShips $ turn ^. loadturnRst
 
@@ -50,6 +55,8 @@ main = do
                     let hull = getHull (turn ^. loadturnRst) ship
                     putStr $ " [cargo:" ++ printf "%4d" (cargoUsed ship) ++ "/" ++ printf "%4d" (hull ^. hullCargo) ++ "]"
 
+                    putStr $ " [ammo:" ++ printf "%2d" (ship ^. shipAmmo) ++ "]"
+
                     putStrLn $ " (" ++ printf "%3d" (ship ^. shipId) ++ " - " ++ ship ^. shipName ++ ")"
                     pure ()
                 ) myShips'
@@ -60,8 +67,9 @@ main = do
 
     putStrLn "\nProduction per planet:"
     void $ mapM (\planet -> do
-                    putStr $ show $ production planet
+                    putStr $ (show $ production planet)
                     putStrLn $ " (" ++ planet ^. planetName ++ " - " ++ show (nativeType (planet ^. planetNativeType)) ++ ")"
+                    putStrLn $ (showPotentialResources $ potentialProduction planet)
                     pure ()
                 ) myPlanets'
     putStrLn "\nTotal:"

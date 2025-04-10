@@ -61,15 +61,30 @@ data Resources = Resources
 
 instance Show Resources where
     show :: Resources -> String
-    show r = "[ " ++
-        "MCr: " ++ fmt (_resourcesMegaCredits r) ++ ", " ++
-        "Sup: " ++ fmt (_resourcesSupplies r) ++ ", " ++
-        "Neu: " ++ fmt (_resourcesNeutronium r) ++ ", " ++
-        "Mol: " ++ fmt (_resourcesMolybdenum r) ++ ", " ++
-        "Dur: " ++ fmt (_resourcesDuranium r) ++ ", " ++
-        "Tri: " ++ fmt (_resourcesTritanium r) ++
+    show = showResources
+
+showResources :: Resources -> String
+showResources r = "[ " ++
+        "Mc:" ++ fmt (_resourcesMegaCredits r) ++ ", " ++
+        "Su:" ++ fmt (_resourcesSupplies r) ++ ", " ++
+        "Ne:" ++ fmt (_resourcesNeutronium r) ++ ", " ++
+        "Du:" ++ fmt (_resourcesDuranium r) ++ ", " ++
+        "Tr:" ++ fmt (_resourcesTritanium r) ++ ", " ++
+        "Mo:" ++ fmt (_resourcesMolybdenum r) ++
         " ]"
             where fmt = printf "%4d"
+
+showPotentialResources :: Resources -> String
+showPotentialResources r = "[ " ++
+        "  /" ++ fmt (_resourcesMegaCredits r) ++ ", " ++
+        "  /" ++ fmt (_resourcesSupplies r) ++ ", " ++
+        "  /" ++ fmt (_resourcesNeutronium r) ++ ", " ++
+        "  /" ++ fmt (_resourcesDuranium r) ++ ", " ++
+        "  /" ++ fmt (_resourcesTritanium r) ++ ", " ++
+        "  /" ++ fmt (_resourcesMolybdenum r) ++
+        " ]"
+            where fmt = printf "%4d"
+
 
 instance Semigroup Resources where
   (<>) :: Resources -> Resources -> Resources
@@ -120,6 +135,17 @@ nativeType 9  = Siliconoid
 nativeType 10 = Botanical
 nativeType _  = Unknown
 
+data GovtType
+    = Anarchy
+    | PreTribal
+    | EarlyTribal
+    | Tribal
+    | Feudal
+    | Monarchy
+    | Representative
+    | Participatory
+    | Unity
+
 myPlanets :: Rst -> [Planet]
 myPlanets rst =
     let myId = rst ^. rstPlayer ^. playerId
@@ -146,6 +172,29 @@ cargoUsed ship =
 totalResources :: ResourceHolder a => [a] -> Resources
 totalResources =
     foldl (\acc e -> acc <> resources e) mempty
+
+potentialProduction :: Planet -> Resources
+potentialProduction planet =
+    let racialTaxModifier :: Double
+        racialTaxModifier = 1 / 10
+
+        nativesTax = (round $ fromIntegral (planet ^. planetNativeClans)
+                            * fromIntegral (planet ^. planetNativeTaxRate) / 100
+                            * fromIntegral (planet ^. planetNativeTaxValue) / 100
+                            * racialTaxModifier)
+                        -- Insectoids accumulate 2x tax
+                        * case nativeType $ planet ^. planetNativeType of
+                            Insectoid -> 2
+                            _         -> 1
+
+     in Resources
+        { _resourcesMegaCredits = nativesTax
+        , _resourcesSupplies    = 0
+        , _resourcesNeutronium  = 0
+        , _resourcesMolybdenum  = 0
+        , _resourcesDuranium    = 0
+        , _resourcesTritanium   = 0
+        }
 
 production :: Planet -> Resources
 production planet =
