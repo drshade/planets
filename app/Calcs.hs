@@ -8,16 +8,17 @@ import           Api              (Hull, Planet, Rst, Ship, hullId, planetClans,
                                    planetGroundMolybdenum,
                                    planetGroundNeutronium,
                                    planetGroundTritanium, planetMegaCredits,
-                                   planetMines, planetMolybdenum,
+                                   planetMines, planetMolybdenum, planetName,
                                    planetNativeClans, planetNativeTaxRate,
                                    planetNativeTaxValue, planetNativeType,
                                    planetNeutronium, planetOwnerId,
-                                   planetSupplies, planetTritanium, playerId,
-                                   rstHulls, rstPlanets, rstPlayer, rstShips,
-                                   shipClans, shipDuranium, shipHullId,
-                                   shipMegaCredits, shipMolybdenum,
-                                   shipNeutronium, shipOwnerId, shipSupplies,
-                                   shipTritanium)
+                                   planetSupplies, planetTritanium, planetX,
+                                   planetY, playerId, rstHulls, rstPlanets,
+                                   rstPlayer, rstShips, shipClans, shipDuranium,
+                                   shipHullId, shipId, shipMegaCredits,
+                                   shipMolybdenum, shipName, shipNeutronium,
+                                   shipOwnerId, shipSupplies, shipTritanium,
+                                   shipX, shipY)
 import           Optics           (makeLenses)
 import           Optics.Lens      (Lens')
 import           Optics.Operators
@@ -104,6 +105,19 @@ instance Monoid Resources where
   mappend = (<>)
 
 makeLenses ''Resources
+
+data Race
+    = Feds
+    | Lizards
+    | Birds
+    | Hoards
+    | Privateers
+    | Cyborgs
+    | Crystals
+    | Empire
+    | Robots
+    | Colonies
+    | Plague
 
 data NativeType
     = None
@@ -242,3 +256,39 @@ production planet =
                   $ round $
                     fromIntegral (planet ^. planetMines)
                   * (fromIntegral (planet ^. density) / 100 :: Double)
+
+type TorpedoTechLevel = Int
+type Lightyears = Int
+
+torpsForMinefieldSize :: Race -> TorpedoTechLevel -> Lightyears -> Int
+torpsForMinefieldSize race techlevel lys =
+    let minesPerTorp = techlevel ^ (2 :: Int) * (case race of Robots -> 4; _ -> 1)
+        minesRequired = fromIntegral lys * (3.1416 :: Double) ** 2
+     in ceiling $ minesRequired * 10 / (fromIntegral minesPerTorp)
+
+getShipByName :: Rst -> String -> [Ship]
+getShipByName rst name =
+    filter (\s -> s ^. shipName == name) (rst ^. rstShips)
+
+getShipById :: Rst -> Int -> Maybe Ship
+getShipById rst id' =
+    case filter (\s -> s ^. shipId == id') (rst ^. rstShips) of
+        []    -> Nothing
+        (s:_) -> Just s -- can really only be one
+
+getPlanetAtShip :: Rst -> Ship -> Maybe Planet
+getPlanetAtShip rst ship =
+    case planetsAtPosition of
+        []    -> Nothing
+        (p:_) -> Just p -- can really only be one
+    where
+        planetsAtPosition :: [Planet]
+        planetsAtPosition =
+            filter (\p -> p ^. planetX == ship ^. shipX && p ^. planetY == ship ^. shipY)
+                   (rst ^. rstPlanets)
+
+getPlanetByName :: Rst -> String -> Maybe Planet
+getPlanetByName rst name =
+    case filter (\p -> p ^. planetName == name) (rst ^. rstPlanets) of
+        []    -> Nothing
+        (p:_) -> Just p -- can really only be one

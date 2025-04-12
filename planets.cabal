@@ -64,6 +64,9 @@ executable planets
     -- Modules included in this executable, other than Main.
     other-modules:    Api
                     , Calcs
+                    , Auto
+                    , Model
+                    , Scripts
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions: TemplateHaskell, DeriveGeneric
@@ -71,11 +74,12 @@ executable planets
     -- Other library packages from which modules are imported.
     build-depends:    base ^>=4.20.0.0
                     , bytestring
-                    , containers, mtl
+                    , containers, mtl, free
                     , http-client, http-client-tls, http-types
                     , aeson
                     , optics
                     , astar
+                    , cmdargs
 
 
     -- Directories containing source files.
