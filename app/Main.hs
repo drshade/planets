@@ -6,8 +6,8 @@ import           Api                    (Update, currentTurn, hullCargo,
                                          loadturnRst, login, planetName,
                                          planetNativeType, shipAmmo, shipClans,
                                          shipId, shipName, update)
-import           Auto                   (GameState (..), Script, interpretGS,
-                                         restore, runWithGS)
+import           Auto                   (GameState (..), Script, ShipId,
+                                         interpretGS, restore, runWithGS)
 import           Calcs                  (cargoUsed, getHull, getPlanetAtShip,
                                          getShipById, myPlanets, myShips,
                                          nativeType, potentialProduction,
@@ -16,6 +16,7 @@ import           Calcs                  (cargoUsed, getHull, getPlanetAtShip,
 import           Control.Monad          (join, void)
 import           Data.Data              (Data)
 import           Data.Dynamic           (Typeable)
+import           Data.Map               (Map, unions)
 import           Optics.Operators       ((^.))
 import           Scripts                (scripts)
 import           System.Console.CmdArgs (cmdArgs, cmdArgsMode, cmdArgsRun, def,
@@ -124,7 +125,7 @@ main = do
             turn <- currentTurn apikey gameid
             let rst = turn ^. loadturnRst
 
-            let runScript :: (Int, Script) -> [Update]
+            let runScript :: (Int, Script) -> Map ShipId Update
                 runScript = \(shipId, script) ->
                                 let Just ship = getShipById rst shipId
                                     Just planet = getPlanetAtShip rst ship
@@ -132,7 +133,7 @@ main = do
                                     updates = runWithGS (interpretGS restored) $ GameState ship turn
                                     in updates
 
-            updates <- join <$> (mapM
+            updates <- unions <$> (mapM
                                     (\(shipId, script) -> do
                                         putStrLn $ "Running script for " <> show shipId
                                         let updates = runScript (shipId, script)

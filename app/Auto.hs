@@ -7,14 +7,17 @@ import           Calcs                  (getPlanetAtShip, getPlanetByName)
 import           Control.Monad.Free     (Free (..), liftF)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Reader   (ReaderT, ask, runReaderT)
-import           Control.Monad.RWS      (RWS, runRWS, tell)
+import           Control.Monad.RWS      (RWS, modify, runRWS, tell)
+import           Data.Map               (Map, alter, empty, insert)
 import           Optics.Operators
 
 type Script = Instruction ()
 
 data GameState = GameState Ship LoadTurnResponse
 
-type AutoM = RWS GameState [Update] ()
+type ShipId = Int
+
+type AutoM = RWS GameState [String] (Map ShipId Update)
 
 data Amount = Max deriving (Show)
 data Resource = Mc deriving (Show)
@@ -59,7 +62,19 @@ interpretGS (Pure _) = pure ()
 interpretGS (Free (FlyTo planet next)) = do
     GameState ship loadturn <- ask
     case getPlanetByName (loadturn ^. loadturnRst) planet of
-        Just planet' -> tell $ [ShipUpdate (ship ^. shipId) (Just $ planet' ^. planetX) (Just $ planet' ^. planetY) Nothing]
+        Just planet' ->
+            modify $ alter
+                (\old -> case old of
+                    Just old' -> Just $ old'
+                        { _shipUpdateX = Just $ planet' ^. planetX
+                        , _shipUpdateY = Just $ planet' ^. planetY
+                        }
+                    Nothing   -> Just $ ShipUpdate (ship ^. shipId) (Just $ planet' ^. planetX) (Just $ planet' ^. planetY) Nothing
+                ) (ship ^. shipId)
+                        -- insert (ship ^. shipId)
+                        --        [ShipUpdate (ship ^. shipId) (Just $ planet' ^. planetX) (Just $ planet' ^. planetY) Nothing]
+                        --        state
+            -- tell $ [ShipUpdate (ship ^. shipId) (Just $ planet' ^. planetX) (Just $ planet' ^. planetY) Nothing]
         Nothing -> pure ()
         -- Do not continue the script
 interpretGS (Free (Pickup amt resource next)) = do
@@ -72,8 +87,22 @@ interpretGS (Free (Pickup amt resource next)) = do
                     Max -> planet ^. planetMegaCredits
             let amtOnShip = case resource of
                     Mc -> ship ^. shipMegaCredits
-            tell $ [ShipUpdate (ship ^. shipId) Nothing Nothing (Just $ amtOnShip + amtToPickup)]
-            tell $ [PlanetUpdate (planet ^. planetId) (Just $ amtOnPlanet - amtToPickup)]
+
+            modify $ alter
+                (\old -> case old of
+                    Just old' -> Just $ old'
+                        { _shipUpdateMegaCredits = Just $ amtOnShip + amtToPickup
+                        }
+                    Nothing   -> Just $ ShipUpdate (ship ^. shipId) Nothing Nothing (Just $ amtOnShip + amtToPickup)
+                ) (ship ^. shipId)
+            modify $ alter
+                (\old -> case old of
+                    Just old' -> Just $ old'
+                        { _planetUpdateMegaCredits = Just $ amtOnPlanet - amtToPickup
+                        }
+                    Nothing   -> Just $ PlanetUpdate (planet ^. planetId) (Just $ amtOnPlanet - amtToPickup)
+                ) (planet ^. planetId)
+            pure ()
         Nothing     -> pure ()
 
     interpretGS next
@@ -90,14 +119,14 @@ restore location instr =
         (Free (Pickup amt resource next))   -> restore location next
         (Free (DropOff amt resource next))  -> restore location next
 
-runWithRestore :: String -> Instruction a -> GameState -> [Update]
+runWithRestore :: String -> Instruction a -> GameState -> Map ShipId Update
 runWithRestore location script state = do
     let restored = restore location script
     let x = interpretGS restored
     runWithGS x state
 
-runWithGS :: AutoM a -> GameState -> [Update]
+runWithGS :: AutoM a -> GameState -> Map ShipId Update
 runWithGS ama gs =
-    let (a, _state, updates) = runRWS ama gs ()
-     in updates
+    let (a, state, updates) = runRWS ama gs empty
+     in state
 

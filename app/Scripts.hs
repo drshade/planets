@@ -1,7 +1,6 @@
 module Scripts where
-import           Auto     (Amount (..), Resource (..), Script, dropOff, flyTo,
-                           pickup)
-import           Data.Map (Map, fromList)
+import           Auto (Amount (..), Resource (..), Script, dropOff, flyTo,
+                       pickup)
 
 type PlanetName = String
 
@@ -15,7 +14,6 @@ collectAndDropScript fromPlanet toPlanet = do
 
 scripts :: [(Int, Script)]
 scripts =
-    [ (7, collectAndDropScript "Van Maanan's Planet" "Exodious")
-    , (1, collectAndDropScript "Exodious" "Forel")
+    [ (7, collectAndDropScript "Eeeeediot" "Van Maanan's Planet")
     , (6, collectAndDropScript "Forel" "Van Maanan's Planet")
     ]
