@@ -1,5 +1,5 @@
 module Auto where
-import           Api                    (ApiKey, LoadTurnResponse,
+import           Api                    (ApiKey, Hull (..), LoadTurnResponse,
                                          Planet (Planet), Rst, Ship (..),
                                          TransferTargetType (..), Update (..),
                                          defaultPlanetUpdate, defaultShipUpdate,
@@ -10,10 +10,12 @@ import           Api                    (ApiKey, LoadTurnResponse,
                                          planetTritanium, planetX, planetY,
                                          rstPlanets, shipClans, shipDuranium,
                                          shipId, shipMegaCredits,
-                                         shipMolybdenum, shipNeutronium,
-                                         shipSupplies, shipTritanium,
-                                         transferTargetType, update)
-import           Calcs                  (getPlanetAtShip, getPlanetByName)
+                                         shipMolybdenum, shipName,
+                                         shipNeutronium, shipSupplies,
+                                         shipTritanium, transferTargetType,
+                                         update)
+import           Calcs                  (getHull, getPlanetAtShip,
+                                         getPlanetByName)
 import           Control.Monad.Free     (Free (..), liftF)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Reader   (ReaderT, ask, runReaderT)
@@ -37,6 +39,7 @@ data Instr next
     | Pickup Amount Resource next
     | DropOff Amount Resource next
     | GetShip (Ship -> next)
+    | GetShipHull Ship (Hull -> next)
     | GetPlanets ([Planet] -> next)
     deriving (Functor)
 
@@ -54,6 +57,9 @@ dropOff amt resource = liftF $ DropOff amt resource ()
 getShip :: Instruction Ship
 getShip = liftF $ GetShip id
 
+getShipHull :: Ship -> Instruction Hull
+getShipHull ship = liftF $ GetShipHull ship id
+
 getPlanets :: Instruction [Planet]
 getPlanets = liftF $ GetPlanets id
 
@@ -63,6 +69,7 @@ interpret (Free (FlyTo planet next)) = ("FlyTo " <> planet) : interpret next
 interpret (Free (Pickup amt resource next))   = ("Pickup " <> show amt <> " " <> show resource) : interpret next
 interpret (Free (DropOff amt resource next))  = ("DropOff " <> show amt <> " " <> show resource) : interpret next
 interpret (Free (GetShip next)) = ("GetShip") : interpret (next (Ship "" 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0))
+interpret (Free (GetShipHull ship next)) = ("GetShipHull " <> ship ^. shipName) : interpret (next $ Hull "" 0 0)
 interpret (Free (GetPlanets next)) = ("GetPlanets") : interpret (next [])
 
 interpretGS :: Instruction a -> AutoM ()
@@ -127,6 +134,11 @@ interpretGS (Free (GetShip next)) = do
     tell ["GetShip"]
     GameState ship loadturn <- ask
     interpretGS $ next ship
+interpretGS (Free (GetShipHull ship next)) = do
+    tell ["GetHull " <> ship ^. shipName]
+    GameState ship loadturn <- ask
+    let hull = getHull (loadturn ^. loadturnRst) ship
+    interpretGS $ next hull
 interpretGS (Free (GetPlanets next)) = do
     tell ["GetPlanets"]
     GameState ship loadturn <- ask
@@ -191,47 +203,6 @@ transfer ship planet resource amtOnShip amtOnPlanet amtToTransfer = do
             Tri         -> update { _planetUpdateTritanium = Just $ amtOnPlanet - amtToTransfer }
             Mol         -> update { _planetUpdateMolybdenum = Just $ amtOnPlanet - amtToTransfer }
 
-    -- modify $ alter
-    --     (\case
-    --         Just existing -> Just $ case resource of
-    --             Clans       -> existing { _shipUpdateClans = Just $ amtOnShip + amtToTransfer, _shipUpdateTransferClans = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --             Mc          -> existing { _shipUpdateMegaCredits = Just $ amtOnShip + amtToTransfer, _shipUpdateTransferMegaCredits = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --             Supplies    -> existing { _shipUpdateSupplies = Just $ amtOnShip + amtToTransfer, _shipUpdateTransferSupplies = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --             Neu         -> existing { _shipUpdateNeutronium = Just $ amtOnShip + amtToTransfer, _shipUpdateTransferNeutronium = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --             Dur         -> existing { _shipUpdateDuranium = Just $ amtOnShip + amtToTransfer, _shipUpdateTransferDuranium = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --             Tri         -> existing { _shipUpdateTritanium = Just $ amtOnShip + amtToTransfer, _shipUpdateTransferTritanium = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --             Mol         -> existing { _shipUpdateMolybdenum = Just $ amtOnShip + amtToTransfer, _shipUpdateTransferMolybdenum = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --         Nothing       -> Just $ case resource of
-    --             Clans       -> (defaultShipUpdate (ship ^. shipId)) { _shipUpdateClans = (Just $ amtOnShip + amtToTransfer), _shipUpdateTransferClans = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --             Mc          -> (defaultShipUpdate (ship ^. shipId)) { _shipUpdateMegaCredits = (Just $ amtOnShip + amtToTransfer), _shipUpdateTransferMegaCredits = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --             Supplies    -> (defaultShipUpdate (ship ^. shipId)) { _shipUpdateSupplies = (Just $ amtOnShip + amtToTransfer), _shipUpdateTransferSupplies = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --             Neu         -> (defaultShipUpdate (ship ^. shipId)) { _shipUpdateNeutronium = (Just $ amtOnShip + amtToTransfer), _shipUpdateTransferNeutronium = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --             Dur         -> (defaultShipUpdate (ship ^. shipId)) { _shipUpdateDuranium = (Just $ amtOnShip + amtToTransfer), _shipUpdateTransferDuranium = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --             Tri         -> (defaultShipUpdate (ship ^. shipId)) { _shipUpdateTritanium = (Just $ amtOnShip + amtToTransfer), _shipUpdateTransferTritanium = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --             Mol         -> (defaultShipUpdate (ship ^. shipId)) { _shipUpdateMolybdenum = (Just $ amtOnShip + amtToTransfer), _shipUpdateTransferMolybdenum = Just $ amtToTransfer, _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-    --     ) $ ShipEntity (ship ^. shipId)
-    -- modify $ alter
-    --     (\case
-    --         Just existing -> Just $ case resource of
-    --             Clans -> existing { _planetUpdateClans = Just $ amtOnPlanet - amtToTransfer }
-    --             Mc -> existing { _planetUpdateMegaCredits = Just $ amtOnPlanet - amtToTransfer }
-    --             Supplies -> existing { _planetUpdateSupplies = Just $ amtOnPlanet - amtToTransfer }
-    --             Neu -> existing { _planetUpdateNeutronium = Just $ amtOnPlanet - amtToTransfer }
-    --             Dur -> existing { _planetUpdateDuranium = Just $ amtOnPlanet - amtToTransfer }
-    --             Tri -> existing { _planetUpdateTritanium = Just $ amtOnPlanet - amtToTransfer }
-    --             Mol -> existing { _planetUpdateMolybdenum = Just $ amtOnPlanet - amtToTransfer }
-    --         Nothing   -> Just $ case resource of
-    --             Clans -> (defaultPlanetUpdate (planet ^. planetId)) { _planetUpdateClans = (Just $ amtOnPlanet - amtToTransfer) }
-    --             Mc -> (defaultPlanetUpdate (planet ^. planetId)) { _planetUpdateMegaCredits = (Just $ amtOnPlanet - amtToTransfer) }
-    --             Supplies -> (defaultPlanetUpdate (planet ^. planetId)) { _planetUpdateSupplies = (Just $ amtOnPlanet - amtToTransfer) }
-    --             Neu -> (defaultPlanetUpdate (planet ^. planetId)) { _planetUpdateNeutronium = (Just $ amtOnPlanet - amtToTransfer) }
-    --             Dur -> (defaultPlanetUpdate (planet ^. planetId)) { _planetUpdateDuranium = (Just $ amtOnPlanet - amtToTransfer) }
-    --             Tri -> (defaultPlanetUpdate (planet ^. planetId)) { _planetUpdateTritanium = (Just $ amtOnPlanet - amtToTransfer) }
-    --             Mol -> (defaultPlanetUpdate (planet ^. planetId)) { _planetUpdateMolybdenum = (Just $ amtOnPlanet - amtToTransfer) }
-    --     ) $ PlanetEntity (planet ^. planetId)
-
-
-
 restore :: String -> GameState -> Instruction a -> Instruction a
 restore location state@(GameState ship loadturn) instr =
     case instr of
@@ -241,6 +212,9 @@ restore location state@(GameState ship loadturn) instr =
         (Free (Pickup amt resource next))   -> restore location state next
         (Free (DropOff amt resource next))  -> restore location state next
         (Free (GetShip next)) -> restore location state (next ship)
+        (Free (GetShipHull ship next)) -> do
+            let hull = getHull (loadturn ^. loadturnRst) ship
+            restore location state (next hull)
         (Free (GetPlanets next)) -> restore location state (next (loadturn ^. loadturnRst ^. rstPlanets))
 
 runWithRestore :: String -> Instruction a -> GameState -> ([String], Map EntityKey Update)
