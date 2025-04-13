@@ -9,6 +9,7 @@ import qualified Data.ByteString.Lazy.Char8 as LChar8 (pack, unpack)
 import           Data.Char                  (toLower)
 import           Data.List                  (intercalate)
 import           Data.Map                   (Map, elems)
+import           Model                      (EntityKey)
 import           Network.HTTP.Client        (httpLbs, newManager, parseRequest,
                                              responseBody, responseStatus)
 import           Network.HTTP.Client.TLS    (tlsManagerSettings)
@@ -188,7 +189,7 @@ fetch url = do
             P.error $ "Non-200 response returned... implement this! -> " ++ body
         else do
             let body :: String = LChar8.unpack $ responseBody resp
-            -- putStrLn $ "Response: " ++ body
+            putStrLn $ "Response: " ++ body
             -- First check if it's an error by decoding the response
             let errorResponse = decode (LChar8.pack body) :: Maybe ErrorResponse
             case errorResponse of
@@ -213,34 +214,84 @@ currentTurn apiKey gameId = do
     res :: LoadTurnResponse <- fetch url
     pure res
 
+data TransferTargetType = PlanetTransferTarget
+
+transferTargetType :: TransferTargetType -> Int
+transferTargetType PlanetTransferTarget = 1
+
 data Update
     = ShipUpdate
-        { _shipUpdateShipId      :: Int
-        , _shipUpdateX           :: Maybe Int
-        , _shipUpdateY           :: Maybe Int
-        , _shipUpdateMegaCredits :: Maybe Int
+        { _shipUpdateShipId              :: Int
+        , _shipUpdateX                   :: Maybe Int
+        , _shipUpdateY                   :: Maybe Int
+        , _shipUpdateClans               :: Maybe Int
+        , _shipUpdateMegaCredits         :: Maybe Int
+        , _shipUpdateSupplies            :: Maybe Int
+        , _shipUpdateNeutronium          :: Maybe Int
+        , _shipUpdateDuranium            :: Maybe Int
+        , _shipUpdateTritanium           :: Maybe Int
+        , _shipUpdateMolybdenum          :: Maybe Int
+        , _shipUpdateTransferTargetId    :: Maybe Int
+        , _shipUpdateTransferTargetType  :: Maybe Int
+        , _shipUpdateTransferClans       :: Maybe Int
+        , _shipUpdateTransferMegaCredits :: Maybe Int
+        , _shipUpdateTransferSupplies    :: Maybe Int
+        , _shipUpdateTransferNeutronium  :: Maybe Int
+        , _shipUpdateTransferDuranium    :: Maybe Int
+        , _shipUpdateTransferTritanium   :: Maybe Int
+        , _shipUpdateTransferMolybdenum  :: Maybe Int
         }
     | PlanetUpdate
         { _planetUpdatePlanetId    :: Int
+        , _planetUpdateClans       :: Maybe Int
         , _planetUpdateMegaCredits :: Maybe Int
+        , _planetUpdateSupplies    :: Maybe Int
+        , _planetUpdateNeutronium  :: Maybe Int
+        , _planetUpdateDuranium    :: Maybe Int
+        , _planetUpdateTritanium   :: Maybe Int
+        , _planetUpdateMolybdenum  :: Maybe Int
         }
 
+defaultShipUpdate _id = ShipUpdate _id Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+defaultPlanetUpdate _id = PlanetUpdate _id Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+
 instance Show Update where
-    show (ShipUpdate id' x y mc) =
+    show (ShipUpdate id' x y clans mc sup neu dur tri mol transferTargetId transferTargetType' transferClans transferMc transferSup transferNeu transferDur transferTri transferMol) =
         "Ship" <> show id' <> "=Id:::" <> show id'
         <> build "TargetX" x
         <> build "TargetY" y
+        <> build "Clans" clans
         <> build "MegaCredits" mc
-    show (PlanetUpdate id' mc) =
+        <> build "Supplies" sup
+        <> build "Neutronium" neu
+        <> build "Duranium" dur
+        <> build "Tritanium" tri
+        <> build "Molybdenum" mol
+        <> build "TransferClans" transferClans
+        <> build "TransferMegaCredits" transferMc
+        <> build "TransferSupplies" transferSup
+        <> build "TransferNeutronium" transferNeu
+        <> build "TransferDuranium" transferDur
+        <> build "TransferTritanium" transferTri
+        <> build "TransferMolybdenum" transferMol
+        <> build "TransferTargetId" transferTargetId
+        <> build "TransferTargetType" transferTargetType'
+        <> build "Mission" (Just 0 :: Maybe Int)
+    show (PlanetUpdate id' clans mc sup neu tri dur mol) =
         "Planet" <> show id' <> "=Id:::" <> show id'
+        <> build "Clans" clans
         <> build "MegaCredits" mc
+        <> build "Supplies" sup
+        <> build "Neutronium" neu
+        <> build "Duranium" dur
+        <> build "Tritanium" tri
+        <> build "Molybdenum" mol
 
 build :: Show a => String -> Maybe a -> String
 build _ Nothing    = ""
 build key (Just x) = "|||" <> key <> ":::" <> show x
 
-
-update :: ApiKey -> LoadTurnResponse -> Map Int Update -> Planets ()
+update :: ApiKey -> LoadTurnResponse -> Map EntityKey Update -> Planets ()
 update apikey loadturn updates = do
     let params = "?gameid=" <> show (loadturn ^. loadturnRst ^. rstGame ^. gameId)
                  <> "&playerid=" <> show (loadturn ^. loadturnRst ^. rstPlayer ^. playerId)
@@ -249,9 +300,13 @@ update apikey loadturn updates = do
                  <> "&savekey=" <> (loadturn ^. loadturnSaveKey)
                  <> "&apikey=" <> apikey
                  <> "&saveindex=2"
-                --  <> "&Ship7=Id:::7|||Name:::LARGE+DEEP+SPACE+FREIGHTER|||Neutronium:::100|||Duranium:::0|||Tritanium:::0|||Molybdenum:::0|||MegaCredits:::110|||Supplies:::0|||Clans:::0|||Ammo:::0|||TransferNeutronium:::0|||TransferDuranium:::0|||TransferTritanium:::0|||TransferMolybdenum:::0|||TransferMegaCredits:::0|||TransferSupplies:::0|||TransferClans:::0|||TransferAmmo:::0|||TransferTargetId:::0|||TransferTargetType:::0|||TargetX:::1690|||TargetY:::2030|||FriendlyCode:::svw|||Warp:::9|||Mission:::0|||Mission1Target:::0|||Mission2Target:::0|||PodHullId:::0|||PodCargo:::0|||Enemy:::0|||Waypoints:::|||ReadyStatus:::0&Planet16=Id:::16|||FriendlyCode:::316|||Mines:::355|||Factories:::255|||Defense:::20|||TargetMines:::0|||TargetFactories:::0|||TargetDefense:::0|||BuiltMines:::0|||BuiltFactories:::0|||BuiltDefense:::0|||MegaCredits:::2725|||Supplies:::502|||SuppliesSold:::0|||Neutronium:::810|||Molybdenum:::1384|||Duranium:::236|||Tritanium:::868|||Clans:::24150|||ColonistTaxRate:::7|||NativeTaxRate:::0|||BuildingStarbase:::false|||NativeHappyChange:::1|||ColHappyChange:::0|||ColChange:::0|||ReadyStatus:::0|||PodHullId:::0|||PodCargo:::0|||PodSpeed:::0|||NativeClans:::0|||TargetX:::1926|||TargetY:::1894|||DevelopmentLevel:::0&Starbase1=Id:::1|||Fighters:::20|||Defense:::100|||BuiltFighters:::0|||BuiltDefense:::0|||HullTechLevel:::6|||EngineTechLevel:::10|||BeamTechLevel:::1|||TorpTechLevel:::1|||HullTechUp:::0|||EngineTechUp:::0|||BeamTechUp:::0|||TorpTechUp:::0|||Mission:::0|||Mission1Target:::0|||ShipMission:::0|||TargetShipId:::0|||BuildHullId:::0|||BuildEngineId:::0|||BuildBeamId:::0|||BuildTorpedoId:::0|||BuildBeamCount:::0|||BuildTorpCount:::0|||IsBuilding:::false|||ReadyStatus:::0"
-                 <> "&" <> intercalate "&" (show <$> elems updates)
+                 --  <> "&Ship7=Id:::7|||Name:::LARGE+DEEP+SPACE+FREIGHTER|||Neutronium:::100|||Duranium:::0|||Tritanium:::0|||Molybdenum:::0|||MegaCredits:::110|||Supplies:::0|||Clans:::0|||Ammo:::0|||TransferNeutronium:::0|||TransferDuranium:::0|||TransferTritanium:::0|||TransferMolybdenum:::0|||TransferMegaCredits:::0|||TransferSupplies:::0|||TransferClans:::0|||TransferAmmo:::0|||TransferTargetId:::0|||TransferTargetType:::0|||TargetX:::1690|||TargetY:::2030|||FriendlyCode:::svw|||Warp:::9|||Mission:::0|||Mission1Target:::0|||Mission2Target:::0|||PodHullId:::0|||PodCargo:::0|||Enemy:::0|||Waypoints:::|||ReadyStatus:::0&Planet16=Id:::16|||FriendlyCode:::316|||Mines:::355|||Factories:::255|||Defense:::20|||TargetMines:::0|||TargetFactories:::0|||TargetDefense:::0|||BuiltMines:::0|||BuiltFactories:::0|||BuiltDefense:::0|||MegaCredits:::2725|||Supplies:::502|||SuppliesSold:::0|||Neutronium:::810|||Molybdenum:::1384|||Duranium:::236|||Tritanium:::868|||Clans:::24150|||ColonistTaxRate:::7|||NativeTaxRate:::0|||BuildingStarbase:::false|||NativeHappyChange:::1|||ColHappyChange:::0|||ColChange:::0|||ReadyStatus:::0|||PodHullId:::0|||PodCargo:::0|||PodSpeed:::0|||NativeClans:::0|||TargetX:::1926|||TargetY:::1894|||DevelopmentLevel:::0&Starbase1=Id:::1|||Fighters:::20|||Defense:::100|||BuiltFighters:::0|||BuiltDefense:::0|||HullTechLevel:::6|||EngineTechLevel:::10|||BeamTechLevel:::1|||TorpTechLevel:::1|||HullTechUp:::0|||EngineTechUp:::0|||BeamTechUp:::0|||TorpTechUp:::0|||Mission:::0|||Mission1Target:::0|||ShipMission:::0|||TargetShipId:::0|||BuildHullId:::0|||BuildEngineId:::0|||BuildBeamId:::0|||BuildTorpedoId:::0|||BuildBeamCount:::0|||BuildTorpCount:::0|||IsBuilding:::false|||ReadyStatus:::0"
+                 --            "Id:::1|||Name:::Medium+Deep+Space+Freighter|||Neutronium:::75|||Duranium:::0|||Tritanium:::0|||Molybdenum:::0|||MegaCredits:::0|||Supplies:::0|||Clans:::0|||Ammo:::0|||TransferNeutronium:::0|||TransferDuranium:::0|||TransferTritanium:::0|||TransferMolybdenum:::0|||TransferMegaCredits:::400|||TransferSupplies:::100|||TransferClans:::100|||TransferAmmo:::0|||TransferTargetId:::7|||TransferTargetType:::1|||TargetX:::1924|||TargetY:::1914|||FriendlyCode:::sdt|||Warp:::9|||Mission:::0|||Mission1Target:::0|||Mission2Target:::0|||PodHullId:::0|||PodCargo:::0|||Enemy:::0|||Waypoints:::|||ReadyStatus:::0""
+                 <> (if 0 < (length $ elems updates)
+                        then "&" <> intercalate "&" (show <$> elems updates)
+                        else "")
                  <> "&keycount=" <> show (8 + length updates)
+    putStrLn params
     let apiUrl = "http://api.planets.nu/game/save"
     req <- parseRequest $ apiUrl ++ params
     manager <- newManager tlsManagerSettings

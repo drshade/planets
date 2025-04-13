@@ -16,7 +16,8 @@ import           Calcs                  (cargoUsed, getHull, getPlanetAtShip,
 import           Control.Monad          (join, void)
 import           Data.Data              (Data)
 import           Data.Dynamic           (Typeable)
-import           Data.Map               (Map, unions)
+import           Data.Map               (Map, empty, unions)
+import           Model                  (EntityKey)
 import           Optics.Operators       ((^.))
 import           Scripts                (scripts)
 import           System.Console.CmdArgs (cmdArgs, cmdArgsMode, cmdArgsRun, def,
@@ -125,18 +126,24 @@ main = do
             turn <- currentTurn apikey gameid
             let rst = turn ^. loadturnRst
 
-            let runScript :: (Int, Script) -> Map ShipId Update
+            let runScript :: (Int, Script) -> ([String], Map EntityKey Update)
                 runScript = \(shipId, script) ->
-                                let Just ship = getShipById rst shipId
-                                    Just planet = getPlanetAtShip rst ship
-                                    restored = restore (planet ^. planetName) script
-                                    updates = runWithGS (interpretGS restored) $ GameState ship turn
-                                    in updates
+                                case getShipById rst shipId of
+                                    Nothing -> ([], empty)
+                                    Just ship ->
+                                        -- Current scripts work when the ship is at a planet
+                                        case getPlanetAtShip rst ship of
+                                            Nothing -> ([], empty)
+                                            Just planet ->
+                                                let state = GameState ship turn
+                                                    restored = restore (planet ^. planetName) state script
+                                                in runWithGS (interpretGS restored) $ state
 
             updates <- unions <$> (mapM
                                     (\(shipId, script) -> do
                                         putStrLn $ "Running script for " <> show shipId
-                                        let updates = runScript (shipId, script)
+                                        let (log, updates) = runScript (shipId, script)
+                                        putStrLn $ "Log: " <> show log
                                         pure updates
                                     )
                                     scripts

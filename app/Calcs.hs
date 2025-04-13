@@ -24,6 +24,17 @@ import           Optics.Lens      (Lens')
 import           Optics.Operators
 import           Text.Printf      (printf)
 
+class HasPosition a where
+    position :: a -> (Int, Int)
+
+instance HasPosition Planet where
+    position :: Planet -> (Int, Int)
+    position p = (p ^. planetX, p ^. planetY)
+
+instance HasPosition Ship where
+    position :: Ship -> (Int, Int)
+    position s = (s ^. shipX, s ^. shipY)
+
 class ResourceHolder a where
     resources :: a -> Resources
 
@@ -292,3 +303,9 @@ getPlanetByName rst name =
     case filter (\p -> p ^. planetName == name) (rst ^. rstPlanets) of
         []    -> Nothing
         (p:_) -> Just p -- can really only be one
+
+distance :: HasPosition a => HasPosition b => a -> b -> Int
+distance p1 p2 =
+    let (x1, y1) = position p1
+        (x2, y2) = position p2
+     in abs (x1 - x2) + abs (y1 - y2)
