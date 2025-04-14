@@ -1,16 +1,12 @@
 module Scripts where
-import           Api           (hullCargo, planetName, planetOwnerId)
-import           Auto          (Script, dropOff, flyTo, getPlanets, getShip,
-                                getShipHull, pickup)
-import           Calcs         (distance)
-import           Data.Foldable (minimumBy)
-import           Model         (Amount (..), Resource (..))
-import           Optics        ((^.))
+import           Data.Foldable        (minimumBy)
+import           Optics               ((^.))
+import           Scripting.Model
+import           Scripting.ShipScript
 
 type PlanetName = String
-type ShipId = Int
 
-collectAndDropScript :: PlanetName -> PlanetName -> Script
+collectAndDropScript :: PlanetName -> PlanetName -> ShipScript
 collectAndDropScript fromPlanet toPlanet = do
     flyTo toPlanet
     dropOff Max Mc
@@ -18,7 +14,7 @@ collectAndDropScript fromPlanet toPlanet = do
     pickup Max Mc
     flyTo toPlanet
 
-coloniseScript :: PlanetName -> Script
+coloniseScript :: PlanetName -> ShipScript
 coloniseScript homeplanet = do
     flyTo homeplanet
     pickup (Exact 100) Clans
@@ -45,16 +41,15 @@ coloniseScript homeplanet = do
 
     pure ()
 
-coloniseWithRatiosScript :: PlanetName -> Script
+coloniseWithRatiosScript :: PlanetName -> ShipScript
 coloniseWithRatiosScript homeplanet = do
     -- Get the ship (this script is attached to)
     flyTo homeplanet
 
     ship <- getShip
-    hull <- getShipHull ship
 
-    pickup (Exact $ hull ^. hullCargo * 60 `div` 100) Clans
-    pickup (Exact $ hull ^. hullCargo * 40 `div` 100) Supplies
+    pickup (Exact $ ship ^. shipHull ^. hullCargo * 60 `div` 100) Clans
+    pickup (Exact $ ship ^. shipHull ^. hullCargo * 40 `div` 100) Supplies
     pickup (Exact 400) Mc
     pickup (Exact 100) Neu
 
@@ -74,9 +69,9 @@ coloniseWithRatiosScript homeplanet = do
 
     pure ()
 
-scripts :: [(ShipId, Script)]
+scripts :: [(ShipId, ShipScript)]
 scripts =
-    [ (1, coloniseWithRatiosScript "Aries Ceti")
+    [ (1, coloniseWithRatiosScript "Fred")
     -- , (7, collectAndDropScript "Eeeeediot" "Van Maanan's Planet")
     -- , (6, collectAndDropScript "Forel" "Van Maanan's Planet")
     ]

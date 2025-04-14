@@ -2,30 +2,37 @@
 
 module Main where
 
-import           Api                    (Update, currentTurn, hullCargo,
-                                         loadturnRst, login, planetName,
-                                         planetNativeType, shipAmmo, shipClans,
-                                         shipId, shipName, update)
-import           Auto                   (GameState (..), Script, ShipId,
-                                         interpretGS, restore, runWithGS)
-import           Calcs                  (cargoUsed, getHull, getPlanetAtShip,
-                                         getShipById, myPlanets, myShips,
-                                         nativeType, potentialProduction,
-                                         production, resources,
-                                         showPotentialResources, totalResources)
-import           Control.Monad          (join, void)
-import           Data.Data              (Data)
-import           Data.Dynamic           (Typeable)
-import           Data.Map               (Map, empty, unions)
-import           Model                  (EntityKey)
-import           Optics.Operators       ((^.))
-import           Scripts                (scripts)
-import           System.Console.CmdArgs (cmdArgs, cmdArgsMode, cmdArgsRun, def,
-                                         explicit, help, modes, name, opt,
-                                         program, summary, typ, (&=))
-import           System.Environment     (getArgs)
-import           System.IO.Error        (tryIOError)
-import           Text.Printf            (printf)
+import           Api                             (currentTurn, loadturnRst,
+                                                  login, shipClans, update)
+import           Calcs                           (production)
+import           Control.Monad                   (join, void)
+import           Data.Data                       (Data)
+import           Data.Dynamic                    (Typeable)
+import           Data.Map                        (Map, empty, unions)
+import           Optics.Operators                ((^.))
+import qualified Scripting.Model                 as Model (Gamestate,
+                                                           fromLoadTurnResponse)
+import           Scripting.Model                 (cargoUsed, getPlanetAtShip,
+                                                  getShipById, hullCargo,
+                                                  myPlanets, myShips,
+                                                  planetName, planetNativeType,
+                                                  planetResources,
+                                                  resourcesClans, shipAmmo,
+                                                  shipHull, shipId, shipName,
+                                                  shipResources, totalResources)
+import           Scripting.ShipScript            (ShipScript,
+                                                  ShipScriptEnvironment (ShipScriptEnvironment),
+                                                  ShipScriptLog,
+                                                  ShipScriptState (..))
+import           Scripting.ShipScriptInterpreter (restoreAndRun)
+import           Scripts                         (scripts)
+import           System.Console.CmdArgs          (cmdArgs, cmdArgsMode,
+                                                  cmdArgsRun, def, explicit,
+                                                  help, modes, name, opt,
+                                                  program, summary, typ, (&=))
+import           System.Environment              (getArgs)
+import           System.IO.Error                 (tryIOError)
+import           Text.Printf                     (printf)
 
 -- Read from file, first line is username, second line is password
 readCredential :: IO (String, String)
@@ -50,13 +57,15 @@ printSummaryReport gameid = do
     (username, password) <- readCredential
     apikey <- login username password
     turn <- currentTurn apikey gameid
-    let myPlanets' = myPlanets $ turn ^. loadturnRst
-    let myShips' = myShips $ turn ^. loadturnRst
+    let gamestate = Model.fromLoadTurnResponse turn
+
+    let myPlanets' = myPlanets gamestate
+    let myShips' = myShips gamestate
 
     putStrLn $ "\nResources per planet:"
     void $ mapM (\planet -> do
-                    putStr $ show $ resources planet
-                    putStrLn $ " (" ++ planet ^. planetName ++ " - " ++ show (nativeType (planet ^. planetNativeType)) ++ ")"
+                    putStr $ show $ planet ^. planetResources
+                    putStrLn $ " (" ++ planet ^. planetName ++ " - " ++ show (planet ^. planetNativeType) ++ ")"
                     pure ()
                 ) myPlanets'
 
@@ -67,10 +76,10 @@ printSummaryReport gameid = do
     putStrLn "\nResources per ship:"
     void $ mapM (\ship -> do
 
-                    putStr $ show $ resources ship
-                    putStr $ " [clans:" ++ printf "%4d" (ship ^. shipClans) ++ "]"
+                    putStr $ show $ ship ^. shipResources
+                    putStr $ " [clans:" ++ printf "%4d" (ship ^. shipResources ^. resourcesClans) ++ "]"
 
-                    let hull = getHull (turn ^. loadturnRst) ship
+                    let hull = ship ^. shipHull
                     putStr $ " [cargo:" ++ printf "%4d" (cargoUsed ship) ++ "/" ++ printf "%4d" (hull ^. hullCargo) ++ "]"
 
                     putStr $ " [ammo:" ++ printf "%2d" (ship ^. shipAmmo) ++ "]"
@@ -86,8 +95,8 @@ printSummaryReport gameid = do
     putStrLn "\nProduction per planet:"
     void $ mapM (\planet -> do
                     putStr $ (show $ production planet)
-                    putStrLn $ " (" ++ planet ^. planetName ++ " - " ++ show (nativeType (planet ^. planetNativeType)) ++ ")"
-                    putStrLn $ (showPotentialResources $ potentialProduction planet)
+                    putStrLn $ " (" ++ planet ^. planetName ++ " - " ++ show (planet ^. planetNativeType) ++ ")"
+                    -- putStrLn $ (showPotentialResources $ potentialProduction planet)
                     pure ()
                 ) myPlanets'
     putStrLn "\nTotal:"
@@ -123,32 +132,40 @@ main = do
 
             (username, password) <- readCredential
             apikey <- login username password
-            turn <- currentTurn apikey gameid
-            let rst = turn ^. loadturnRst
+            loadturn <- currentTurn apikey gameid
+            -- let rst = loadturn ^. loadturnRst
 
-            let runScript :: (Int, Script) -> ([String], Map EntityKey Update)
+            let gamestate :: Model.Gamestate
+                gamestate = Model.fromLoadTurnResponse loadturn
+
+            let runScript :: (Int, ShipScript) -> (ShipScriptLog, ShipScriptState)
                 runScript = \(shipId, script) ->
-                                case getShipById rst shipId of
-                                    Nothing -> ([], empty)
+                                case getShipById gamestate shipId of
+                                    Nothing -> ([], ShipScriptState empty empty)
                                     Just ship ->
                                         -- Current scripts work when the ship is at a planet
-                                        case getPlanetAtShip rst ship of
-                                            Nothing -> ([], empty)
+                                        case getPlanetAtShip gamestate ship of
+                                            Nothing -> ([], ShipScriptState empty empty)
                                             Just planet ->
-                                                let state = GameState ship turn
-                                                    restored = restore (planet ^. planetName) state script
-                                                in runWithGS (interpretGS restored) $ state
+                                                let environment = ShipScriptEnvironment ship gamestate
+                                                in restoreAndRun environment script
 
-            updates <- unions <$> (mapM
-                                    (\(shipId, script) -> do
-                                        putStrLn $ "Running script for " <> show shipId
-                                        let (log, updates) = runScript (shipId, script)
-                                        putStrLn $ "Log: " <> show log
-                                        pure updates
-                                    )
-                                    scripts
-                                )
+            shipScriptStates :: [ShipScriptState]
+                <- mapM
+                    (\(shipId, script) -> do
+                        putStrLn $ "Running script for " <> show shipId
+                        let (log, updates) = runScript (shipId, script)
+                        putStrLn $ "Log: " <> show log
+                        pure updates
+                    )
+                    scripts
+
+            -- Union them together
+            let updates = (\(ShipScriptState shipUpdates planetUpdates) -> (shipUpdates, planetUpdates)) <$> shipScriptStates
+            let shipUpdates = unions $ (\(shipUpdates, _) -> shipUpdates) <$> updates
+            let planetUpdates = unions $ (\(_, planetUpdates) -> planetUpdates) <$> updates
+
             putStrLn $ "Updates: " <> show updates
-            update apikey turn updates
+            update apikey loadturn shipUpdates planetUpdates
             putStrLn "end"
 
