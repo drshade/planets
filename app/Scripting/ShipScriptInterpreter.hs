@@ -5,27 +5,25 @@ import           Api                  (PlanetUpdate (..), ShipUpdate (..),
                                        transferTargetType)
 import           Control.Monad.Free   (Free (..))
 import           Control.Monad.RWS    (MonadState, ask, modify, runRWS, tell)
-import           Data.Map             (Map, adjust, alter, empty)
-import           Optics               ((^.), (^?))
-import           Scripting.Model      (Amount (..), Gamestate, Planet,
-                                       Resource (..), Ship, gamestatePlanets,
-                                       getPlanetAtShip, getPlanetByName,
-                                       mineralsDuranium, mineralsMolybdenum,
-                                       mineralsNeutronium, mineralsTritanium,
-                                       planetId, planetName, planetPosition,
-                                       planetResources, positionX, positionY,
-                                       resourcesClans, resourcesMegaCredits,
-                                       resourcesMinerals, resourcesSupplies,
-                                       shipId, shipName, shipResources)
+import           Data.Map             (adjust, alter, empty)
+import           Optics               ((^.))
+import           Scripting.Model      (Amount (..), Planet, Resource (..), Ship,
+                                       gamestatePlanets, getPlanetAtShip,
+                                       getPlanetByName, mineralsDuranium,
+                                       mineralsMolybdenum, mineralsNeutronium,
+                                       mineralsTritanium, planetId, planetName,
+                                       planetPosition, planetResources,
+                                       positionX, positionY, resourcesClans,
+                                       resourcesMegaCredits, resourcesMinerals,
+                                       resourcesSupplies, shipId, shipResources)
 import           Scripting.ShipScript (ShipScript, ShipScriptEnvironment (..),
                                        ShipScriptInstr (..),
                                        ShipScriptInstruction, ShipScriptLog,
                                        ShipScriptRWS, ShipScriptState (..))
 
-
-interpretGS :: ShipScriptInstruction a -> ShipScriptRWS ()
-interpretGS (Pure _) = pure ()
-interpretGS (Free (FlyTo planet next)) = do
+interpretRWS :: ShipScriptInstruction a -> ShipScriptRWS ()
+interpretRWS (Pure _) = pure ()
+interpretRWS (Free (FlyTo planet _next)) = do
     tell ["FlyTo " <> planet]
     ShipScriptEnvironment ship gamestate <- ask
     case getPlanetByName gamestate planet of
@@ -48,7 +46,7 @@ interpretGS (Free (FlyTo planet next)) = do
                       )
         Nothing -> pure ()
         -- Do not continue the script
-interpretGS (Free (Pickup amt resource next)) = do
+interpretRWS (Free (Pickup amt resource next)) = do
     tell ["Pickup " <> show amt <> " " <> show resource]
     ShipScriptEnvironment ship gamestate <- ask
     case getPlanetAtShip gamestate ship of
@@ -68,8 +66,8 @@ interpretGS (Free (Pickup amt resource next)) = do
             transfer ship planet resource amtOnShip amtOnPlanet amtToTransfer
             pure ()
         Nothing     -> pure ()
-    interpretGS next
-interpretGS (Free (DropOff amt resource next)) = do
+    interpretRWS next
+interpretRWS (Free (DropOff amt resource next)) = do
     tell ["DropOff " <> show amt <> " " <> show resource]
     ShipScriptEnvironment ship gamestate <- ask
     case getPlanetAtShip gamestate ship of
@@ -88,16 +86,16 @@ interpretGS (Free (DropOff amt resource next)) = do
             transfer ship planet resource amtOnShip amtOnPlanet (-1 * amtToTransfer)
             pure ()
         Nothing     -> pure ()
-    interpretGS next
-interpretGS (Free (GetShip next)) = do
+    interpretRWS next
+interpretRWS (Free (GetShip next)) = do
     tell ["GetShip"]
-    ShipScriptEnvironment ship gamestate <- ask
-    interpretGS $ next ship
-interpretGS (Free (GetPlanets next)) = do
+    ShipScriptEnvironment ship _gamestate <- ask
+    interpretRWS $ next ship
+interpretRWS (Free (GetPlanets next)) = do
     tell ["GetPlanets"]
-    ShipScriptEnvironment ship gamestate <- ask
+    ShipScriptEnvironment _ship gamestate <- ask
     let planets = gamestate ^. gamestatePlanets
-    interpretGS $ next planets
+    interpretRWS $ next planets
 
 transfer :: MonadState ShipScriptState m => Ship -> Planet -> Resource -> Int -> Int -> Int -> m ()
 transfer ship planet resource amtOnShip amtOnPlanet amtToTransfer = do
@@ -193,15 +191,15 @@ restore environment@(ShipScriptEnvironment ship gamestate) instr =
         (Pure a)                                                -> pure a
         (Free (FlyTo planet next)) | Just planet == location    -> next -- found our restore point :)
                                    | otherwise                  -> restore environment next
-        (Free (Pickup amt resource next))                       -> restore environment next
-        (Free (DropOff amt resource next))                      -> restore environment next
+        (Free (Pickup _amt _resource next))                     -> restore environment next
+        (Free (DropOff _amt _resource next))                    -> restore environment next
         (Free (GetShip next))                                   -> restore environment (next ship)
         (Free (GetPlanets next))                                -> restore environment (next (gamestate ^. gamestatePlanets))
 
 restoreAndRun :: ShipScriptEnvironment -> ShipScript -> (ShipScriptLog, ShipScriptState)
 restoreAndRun environment script = do
     let restored = restore environment script
-    let shipScriptRWS = interpretGS restored
+    let shipScriptRWS = interpretRWS restored
     let shipScriptState = ShipScriptState empty empty
     let ((), state, updates) = runRWS shipScriptRWS environment shipScriptState
     (updates, state)

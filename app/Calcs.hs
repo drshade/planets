@@ -8,8 +8,7 @@ import           Scripting.Model (Minerals (..), NativeType (..), Planet,
                                   planetGroundMinerals, planetMines,
                                   planetNativeClans, planetNativeTaxRate,
                                   planetNativeTaxValue, planetNativeType,
-                                  planetResources, resourcesClans,
-                                  resourcesMinerals)
+                                  planetResources, resourcesClans)
 
 production :: Planet -> Resources
 production planet =

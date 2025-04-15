@@ -1,10 +1,11 @@
 module Scripting.Model where
 import qualified Api
-import           Data.Map   (Map)
-import qualified Data.Map   as Map (fromList, lookup)
-import           Data.Maybe (fromMaybe, listToMaybe)
-import           Data.Tuple (swap)
-import           Optics     (makeLenses, (^.))
+import           Data.Map    (Map)
+import qualified Data.Map    as Map (fromList, lookup)
+import           Data.Maybe  (fromMaybe, listToMaybe)
+import           Data.Tuple  (swap)
+import           Optics      (makeLenses, (^.))
+import           Text.Printf (printf)
 
 type GameId = Int
 type PlayerId = Int
@@ -13,6 +14,44 @@ type PlanetId = Int
 
 data Amount = Max | Exact Int deriving (Show)
 data Resource = Mc | Supplies | Clans | Neu | Dur | Tri | Mol deriving (Show)
+
+
+data Minerals = Minerals
+    { _mineralsNeutronium :: Int
+    , _mineralsMolybdenum :: Int
+    , _mineralsDuranium   :: Int
+    , _mineralsTritanium  :: Int
+    }
+
+makeLenses ''Minerals
+
+instance Show Minerals where
+    show :: Minerals -> String
+    show m =
+            "Ne: " ++ pad (m ^. mineralsNeutronium) ++ ", "
+            ++ "Du: " ++ pad (m ^. mineralsDuranium) ++ ", "
+            ++ "Tr: " ++ pad (m ^. mineralsTritanium) ++ ", "
+            ++ "Mo: " ++ pad (m ^. mineralsMolybdenum)
+            where pad = printf "%4d"
+
+data Resources = Resources
+    { _resourcesMegaCredits :: Int
+    , _resourcesSupplies    :: Int
+    , _resourcesClans       :: Int
+    , _resourcesMinerals    :: Minerals
+    }
+
+makeLenses ''Resources
+
+instance Show Resources where
+    show :: Resources -> String
+    show r =
+        "[" ++ "Mc: " ++ pad (r ^. resourcesMegaCredits) ++ ", "
+            ++ "Sp: " ++ pad (r ^. resourcesSupplies) ++ ", "
+            ++ show (r ^. resourcesMinerals)
+            ++
+        "]"
+        where pad = printf "%4d"
 
 data Gamestate = Gamestate
     { _gamestateGame     :: Game
@@ -36,19 +75,6 @@ data Player = Player
     , _playerRace     :: Race
     } deriving (Show)
 
-data Resources = Resources
-    { _resourcesMegaCredits :: Int
-    , _resourcesSupplies    :: Int
-    , _resourcesClans       :: Int
-    , _resourcesMinerals    :: Minerals
-    } deriving (Show)
-
-data Minerals = Minerals
-    { _mineralsNeutronium :: Int
-    , _mineralsMolybdenum :: Int
-    , _mineralsDuranium   :: Int
-    , _mineralsTritanium  :: Int
-    } deriving (Show)
 
 data Position = Position
     { _positionX :: Int
@@ -162,13 +188,12 @@ instance Enum GovtType where
 makeLenses ''Gamestate
 makeLenses ''Game
 makeLenses ''Player
-makeLenses ''Resources
-makeLenses ''Minerals
 makeLenses ''Position
 makeLenses ''Ship
 makeLenses ''Hull
 makeLenses ''Engine
 makeLenses ''Planet
+
 
 class HasPosition a where
     position :: a -> (Int, Int)
@@ -332,18 +357,20 @@ fromLoadTurnResponse loadturn =
     where
         mapHull :: [Api.Hull] -> Int -> Hull
         mapHull hulls id' =
-            let apiHull = head $ filter (\h -> h ^. Api.hullId == id') hulls
-             in Hull
-                    { _hullName        = apiHull ^. Api.hullName
-                    , _hullId          = apiHull ^. Api.hullId
-                    , _hullCargo       = apiHull ^. Api.hullCargo
-                    , _hullFuelTank    = apiHull ^. Api.hullFuelTank
-                    , _hullFighterBays = apiHull ^. Api.hullFighterBays
-                    , _hullLaunchers   = apiHull ^. Api.hullLaunchers
-                    , _hullBeams       = apiHull ^. Api.hullBeams
-                    , _hullEngines     = apiHull ^. Api.hullEngines
-                    , _hullTechLevel   = apiHull ^. Api.hullTechLevel
-                    }
+            case listToMaybe $ filter (\h -> h ^. Api.hullId == id') hulls of
+                Just apiHull ->
+                    Hull
+                        { _hullName        = apiHull ^. Api.hullName
+                        , _hullId          = apiHull ^. Api.hullId
+                        , _hullCargo       = apiHull ^. Api.hullCargo
+                        , _hullFuelTank    = apiHull ^. Api.hullFuelTank
+                        , _hullFighterBays = apiHull ^. Api.hullFighterBays
+                        , _hullLaunchers   = apiHull ^. Api.hullLaunchers
+                        , _hullBeams       = apiHull ^. Api.hullBeams
+                        , _hullEngines     = apiHull ^. Api.hullEngines
+                        , _hullTechLevel   = apiHull ^. Api.hullTechLevel
+                        }
+                Nothing -> error "Hull not found!"
         mapEngine :: [Api.Engine] -> Int -> Maybe Engine
         mapEngine engines id' =
                 (\e -> Engine

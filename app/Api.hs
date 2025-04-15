@@ -1,6 +1,5 @@
 module Api where
 
-import           Control.Applicative        ((<|>))
 import           Data.Aeson                 (FromJSON,
                                              Options (fieldLabelModifier),
                                              decode, defaultOptions,
@@ -198,7 +197,7 @@ fetch url = do
             P.error $ "Non-200 response returned... implement this! -> " ++ body
         else do
             let body :: String = LChar8.unpack $ responseBody resp
-            putStrLn $ "Response: " ++ body
+            -- putStrLn $ "Response: " ++ body
             -- First check if it's an error by decoding the response
             let errorResponse = decode (LChar8.pack body) :: Maybe ErrorResponse
             case errorResponse of
@@ -218,8 +217,8 @@ login username password = do
     pure $ res ^. loginResponseApiKey
 
 currentTurn :: ApiKey -> GameId -> Planets LoadTurnResponse
-currentTurn apiKey gameId = do
-    let url = "/game/loadturn?apikey=" ++ apiKey ++ "&gameid=" ++ gameId ++ "&forsave=true"
+currentTurn apikey gameid = do
+    let url = "/game/loadturn?apikey=" ++ apikey ++ "&gameid=" ++ gameid ++ "&forsave=true"
     res :: LoadTurnResponse <- fetch url
     pure res
 
