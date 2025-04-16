@@ -1,87 +1,39 @@
 # Planets CLI Tool
-This tool is a command-line utility for the Planets.nu game that helps you track and calculate resources across your planets and ships. It connects to the Planets.nu API to fetch your current game data and provides both reporting and automation capabilities.
+
+A command-line utility for Planets.nu that helps you manage resources and automate ship operations through scripting. This tool connects to the Planets.nu API to fetch your current game data and allows you to run pre-defined scripts to automate repetitive tasks.
+
+*STILL IN ACTIVE DEVELOPMENT*
 
 ## Features
 
-### Resource Tracking
-- Current resources on each planet and ship
-- Production capabilities of each planet
-- Total resources across your empire
-- Cargo usage information for your ships
+- Resource reporting across your empire
+- Ship automation through customizable scripts
+- Production analysis for all planets (tbd)
 
-### Ship Automation
-The tool includes a powerful scripting system that allows you to automate ship operations. You can write scripts to:
-- Move ships between planets
-- Transfer resources between ships and planets
-- Automate colonization missions
-- Create resource collection and distribution routes
+## Ship Automation Scripts
 
-## Installation
-Installing Haskell
-1. Install GHCup, the Haskell toolchain installer:
+The tool includes a powerful scripting system that allows you to automate ship operations. Scripts are defined in `app/Scripts.hs` and attached to specific ships by their ID.
 
-```sh
-curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
-```
+### Example Ship Scripts
 
-2. Follow the prompts to install GHC, Cabal, and other tools
-3. Make sure to add GHCup to your PATH as instructed
+#### 1. Resource Collection and Distribution
 
-Building the Project
+This script automates the process of collecting megacredits from one planet and delivering them to another:
 
-1. Clone this repository
-2. Navigate to the project directory
-3. Build the project using Cabal:
-
-```sh
-cabal build
-```
-
-## Usage
-
-1. Create a .credential file in the project root directory with your Planets.nu credentials:
-
-```
-username
-password
-```
-
-2. Run the tool with a game ID:
-
-For resource reporting:
-```sh
-cabal run planets -- report GAME_ID
-```
-
-For running ship automation scripts:
-```sh
-cabal run planets -- script GAME_ID
-```
-
-Replace GAME_ID with your Planets.nu game identifier (e.g., 643520).
-
-## Scripting
-
-The tool provides a domain-specific language for writing ship automation scripts. Scripts can be defined in the `app/Scripts.hs` file. Here are the available script types and their implementations:
-
-### Resource Collection and Distribution
 ```haskell
 collectAndDropScript :: PlanetName -> PlanetName -> ShipScript
 collectAndDropScript fromPlanet toPlanet = do
     flyTo toPlanet
-    dropOff Max Mc
-    flyTo fromPlanet
     pickup Max Mc
+    flyTo fromPlanet
+    dropOff Max Mc
     flyTo toPlanet
 ```
-This script automates collecting resources from one planet and delivering them to another. It:
-1. Flies to the destination planet
-2. Drops off all available MegaCredits
-3. Returns to the source planet
-4. Picks up all available MegaCredits
-5. Returns to the destination planet
 
-### Colonization
+#### 2. Basic Colonization
+
+Automates the colonization of new planets:
+
 ```haskell
 coloniseScript :: PlanetName -> ShipScript
 coloniseScript homeplanet = do
@@ -108,25 +60,18 @@ coloniseScript homeplanet = do
     -- Fly back home
     flyTo homeplanet
 ```
-This script automates the colonization process by:
-1. Loading specific amounts of required resources:
-   - 100 Clans
-   - 100 Supplies
-   - 400 MegaCredits
-   - 100 Neutronium
-2. Finding the nearest unowned planet
-3. Delivering all resources to establish a colony
-4. Returning to the home planet
 
-### Colonization with Cargo Ratios
+#### 3. Adaptive Colonization
+
+Of course you might want to base your calculations on the capacity of your ship cargo, and so you could do this like the following:
+
 ```haskell
 coloniseWithRatiosScript :: PlanetName -> ShipScript
 coloniseWithRatiosScript homeplanet = do
     flyTo homeplanet
-
+    
     ship <- getShip
 
-    -- Load resources based on ship's cargo capacity
     pickup (Exact $ ship ^. shipHull ^. hullCargo * 60 `div` 100) Clans
     pickup (Exact $ ship ^. shipHull ^. hullCargo * 40 `div` 100) Supplies
     pickup (Exact 400) Mc
@@ -146,94 +91,69 @@ coloniseWithRatiosScript homeplanet = do
     -- Fly back home
     flyTo homeplanet
 ```
-This variant of the colonization script calculates resource amounts based on the ship's cargo capacity:
-- 60% of cargo capacity for Clans
-- 40% of cargo capacity for Supplies
-- Fixed amounts for MC and Neutronium
 
-### Writing Custom Scripts
+## Assigning Scripts to Ships
 
-You can create custom scripts using the following primitives:
-
-#### Movement
-```haskell
-flyTo :: String -> ShipScriptInstruction ()
-```
-Moves the ship to the specified planet.
-
-#### Resource Operations
-```haskell
-pickup :: Amount -> Resource -> ShipScriptInstruction ()
-dropOff :: Amount -> Resource -> ShipScriptInstruction ()
-```
-Load or unload resources from the current planet. The amount can be:
-- `Max` - Maximum available amount
-- `Exact n` - Specific amount
-
-#### Information Retrieval
-```haskell
-getShip :: ShipScriptInstruction Ship
-getPlanets :: ShipScriptInstruction [Planet]
-```
-Get information about the current ship or all planets.
-
-#### Supported Resources
-```haskell
-data Resource = Mc | Supplies | Clans | Neu | Dur | Tri | Mol
-```
-- `Mc` - MegaCredits
-- `Supplies` - Supplies
-- `Clans` - Clans
-- `Neu` - Neutronium
-- `Dur` - Duranium
-- `Tri` - Tritanium
-- `Mol` - Molybdenum
-
-### Example: Custom Resource Distribution Script
-Here's an example of how to write a custom script that distributes resources based on specific ratios:
+To assign scripts to ships, edit the `scripts` list in `app/Scripts.hs`:
 
 ```haskell
-distributeResourcesScript :: PlanetName -> PlanetName -> ShipScript
-distributeResourcesScript source target = do
-    -- Get ship information
-    ship <- getShip
-    let cargoCapacity = ship ^. shipHull ^. hullCargo
-
-    -- Load resources from source
-    flyTo source
-    pickup (Exact $ cargoCapacity * 30 `div` 100) Clans    -- 30% Clans
-    pickup (Exact $ cargoCapacity * 40 `div` 100) Supplies -- 40% Supplies
-    pickup (Exact $ cargoCapacity * 30 `div` 100) Mc       -- 30% MC
-
-    -- Deliver to target
-    flyTo target
-    dropOff Max Clans
-    dropOff Max Supplies
-    dropOff Max Mc
-
-    -- Return to source
-    flyTo source
+scripts :: [(ShipId, ShipScript)]
+scripts =
+    [ (1, coloniseWithRatiosScript "Fred")
+    , (7, collectAndDropScript "Eeeeediot" "Van Maanan's Planet")
+    , (6, collectAndDropScript "Forel" "Van Maanan's Planet")
+    ]
 ```
 
-## Example Output
+## How the Scripting Works
 
-When running in report mode, the tool will display:
+The scripting system uses Free Monads to create a domain-specific language for ship automation. This allows for writing scripts in an imperative style (even though turns run over days and weeks), while retaining no state between executions (at this stage - maybe this will change in the future?).
 
-- Resources on each planet with their native race type
-- Total planetary resources
-- Resources on each ship with cargo and ammunition information
-- Total ship resources
-- Production capabilities for each planet
-- Total production across your empire
+Each script continues from the appropriate point based on the current state of the ship - determining what step to take by examining the ship's location.
 
-# Future Development
+## Future Development
 
 Planned features include:
 
-- Planet Production Potential: More detailed analysis of maximum production capabilities considering all factors
-- Resource Forecasting: Estimate future resources based on:
-  - Ships en route to planets
-  - Expected production over multiple turns
-  - Anticipated resource usage from building projects
-- Strategic Recommendations: Suggestions for optimizing resource distribution
-- Enhanced Scripting: Additional automation capabilities and script primitives
+- Planet scripts! Automate the building of mines / factories / tax rates / etc.
+- Planet Production Potential: More detailed analysis of maximum production capabilities
+- Resource Forecasting: Estimate future resources based on ships en route and production
+- Strategic Recommendations: Optimizing resource distribution
+- Enhanced Scripting: Additional automation capabilities for fleet coordination
+
+## Installation
+
+### Installing Haskell
+
+I recommend using `GHCup` and follow the steps to install a working GHC environment.
+
+### Building the Project
+
+Once haskell & cabal are installed, you should be able to build the project using:
+
+```sh
+cabal build
+```
+
+## Basic Usage
+
+Create a `.credential` file in the project root directory with your Planets.nu credentials:
+
+```
+username
+password
+```
+
+2. Run the tool with a game ID:
+
+For resource reporting:
+```sh
+cabal run planets -- report -g GAME_ID
+```
+
+For running ship automation scripts:
+```sh
+cabal run planets -- script -s GAME_ID
+```
+
+Replace `GAME_ID` with your Planets.nu game identifier (e.g., 643520).
