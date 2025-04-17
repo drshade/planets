@@ -64,7 +64,8 @@ executable planets
     -- Modules included in this executable, other than Main.
     other-modules:    Api
                     , Calcs
-                    , Scripts
+                    , CommonScripts
+                    , MyScripts
                     , Scripting.Model
                     , Scripting.ShipScript
                     , Scripting.ShipScriptInterpreter

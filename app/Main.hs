@@ -8,12 +8,14 @@ import           Control.Monad                   (void)
 import           Data.Data                       (Data)
 import           Data.Dynamic                    (Typeable)
 import           Data.Map                        (empty, unions)
+import           Data.Maybe                      (fromMaybe)
+import           MyScripts                       (GameDef (GameDef), scripts)
 import           Optics.Operators                ((^.))
 import qualified Scripting.Model                 as Model (Gamestate,
                                                            fromLoadTurnResponse)
-import           Scripting.Model                 (cargoUsed, getPlanetAtShip,
-                                                  getShipById, hullCargo,
-                                                  myPlanets, myShips,
+import           Scripting.Model                 (Gamestate, cargoUsed,
+                                                  getPlanetAtShip, getShipById,
+                                                  hullCargo, myPlanets, myShips,
                                                   planetName, planetNativeType,
                                                   planetResources,
                                                   resourcesClans, shipAmmo,
@@ -24,7 +26,6 @@ import           Scripting.ShipScript            (ShipScript,
                                                   ShipScriptLog,
                                                   ShipScriptState (..))
 import           Scripting.ShipScriptInterpreter (restoreAndRun)
-import           Scripts                         (scripts)
 import           System.Console.CmdArgs          (cmdArgsMode, cmdArgsRun, help,
                                                   modes, name, program, summary,
                                                   typ, (&=))
@@ -104,7 +105,7 @@ printSummaryReport gameid = do
 
 data Planets
     = Report { reportGameid :: String }
-    | Script { scriptGameid :: String }
+    | Script { }
     deriving (Show, Data, Typeable)
 
 report :: Planets
@@ -114,7 +115,7 @@ report = Report
 
 script :: Planets
 script = Script
-            { scriptGameid = "641474" &= name "gameid" &= help "Id of the game" &= typ "GAMEID" }
+            { }
             &= help "Display summary of planets & ships"
 
 main :: IO ()
@@ -128,44 +129,39 @@ main = do
 
     case mode of
         Report gameid -> printSummaryReport gameid
-        Script gameid -> do
+        Script -> do
 
             (username, password) <- readCredential
             apikey <- login username password
-            loadturn <- currentTurn apikey gameid
-            -- let rst = loadturn ^. loadturnRst
 
-            let gamestate :: Model.Gamestate
-                gamestate = Model.fromLoadTurnResponse loadturn
+            mapM_
+                (\(GameDef gameid shipScripts planetScripts) -> do
+                    putStrLn $ "Running script for game " <> show gameid
 
-            let runScript :: (Int, ShipScript) -> (ShipScriptLog, ShipScriptState)
-                runScript = \(shipId', script') ->
-                                case getShipById gamestate shipId' of
-                                    Nothing -> ([], ShipScriptState empty empty)
-                                    Just ship ->
-                                        -- Current scripts work when the ship is at a planet
-                                        case getPlanetAtShip gamestate ship of
-                                            Nothing -> ([], ShipScriptState empty empty)
-                                            Just _planet ->
-                                                let environment = ShipScriptEnvironment ship gamestate
-                                                in restoreAndRun environment script'
+                    loadturn <- currentTurn apikey (show gameid)
+                    let gamestate = Model.fromLoadTurnResponse loadturn
 
-            shipScriptStates :: [ShipScriptState]
-                <- mapM
-                    (\(shipId', script') -> do
-                        putStrLn $ "Running script for " <> show shipId'
-                        let (log', updates) = runScript (shipId', script')
-                        putStrLn $ "Log: " <> show log'
-                        pure updates
-                    )
-                    scripts
+                    shipScriptStates <- mapM (\(shipId, shipScript) -> do
+                                let ship = fromMaybe (error $ "Can't find ship! " <> (show shipId))
+                                                     (getShipById gamestate shipId)
+                                let environment = ShipScriptEnvironment ship gamestate
+                                let (log, updates) = restoreAndRun environment shipScript
+                                putStrLn $ "Log: " <> show log
+                                pure updates
 
-            -- Union them together
-            let updates = (\(ShipScriptState shipUpdates planetUpdates) -> (shipUpdates, planetUpdates)) <$> shipScriptStates
-            let shipUpdates = unions $ (\(shipUpdates', _) -> shipUpdates') <$> updates
-            let planetUpdates = unions $ (\(_, planetUpdates') -> planetUpdates') <$> updates
+                            ) shipScripts
 
-            putStrLn $ "Updates: " <> show updates
-            update apikey loadturn shipUpdates planetUpdates
-            putStrLn "end"
+                    let updates = (\(ShipScriptState shipUpdates planetUpdates) -> (shipUpdates, planetUpdates)) <$> shipScriptStates
+                    let shipUpdates = unions $ (\(shipUpdates', _) -> shipUpdates') <$> updates
+                    let planetUpdates = unions $ (\(_, planetUpdates') -> planetUpdates') <$> updates
+
+                    update apikey loadturn shipUpdates planetUpdates
+                    putStrLn "end"
+
+                    pure ()
+                )
+                scripts
+
+
+
 

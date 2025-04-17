@@ -183,18 +183,20 @@ transfer ship planet resource amtOnShip amtOnPlanet amtToTransfer = do
             Tri         -> update { _planetUpdateTritanium = Just $ amtOnPlanet - amtToTransfer }
             Mol         -> update { _planetUpdateMolybdenum = Just $ amtOnPlanet - amtToTransfer }
 
-restore :: ShipScriptEnvironment -> ShipScriptInstruction a -> ShipScriptInstruction a
+restore :: ShipScriptEnvironment -> ShipScriptInstruction () -> ShipScriptInstruction ()
 restore environment@(ShipScriptEnvironment ship gamestate) instr =
     -- Only restores if the ship is at a particular planet that is referenced in the script (for now!)
-    let location = (\p -> p ^. planetName) <$> getPlanetAtShip gamestate ship
-     in case instr of
-        (Pure a)                                                -> pure a
-        (Free (FlyTo planet next)) | Just planet == location    -> next -- found our restore point :)
-                                   | otherwise                  -> restore environment next
-        (Free (Pickup _amt _resource next))                     -> restore environment next
-        (Free (DropOff _amt _resource next))                    -> restore environment next
-        (Free (GetShip next))                                   -> restore environment (next ship)
-        (Free (GetPlanets next))                                -> restore environment (next (gamestate ^. gamestatePlanets))
+    case (\p -> p ^. planetName) <$> getPlanetAtShip gamestate ship of
+        Nothing -> pure ()
+        Just location ->
+            case instr of
+                (Pure ())                                       -> pure ()
+                (Free (FlyTo planet next)) | planet == location -> next -- found our restore point :)
+                                        | otherwise             -> restore environment next
+                (Free (Pickup _amt _resource next))             -> restore environment next
+                (Free (DropOff _amt _resource next))            -> restore environment next
+                (Free (GetShip next))                           -> restore environment (next ship)
+                (Free (GetPlanets next))                        -> restore environment (next (gamestate ^. gamestatePlanets))
 
 restoreAndRun :: ShipScriptEnvironment -> ShipScript -> (ShipScriptLog, ShipScriptState)
 restoreAndRun environment script = do
@@ -203,5 +205,4 @@ restoreAndRun environment script = do
     let shipScriptState = ShipScriptState empty empty
     let ((), state, updates) = runRWS shipScriptRWS environment shipScriptState
     (updates, state)
-
 

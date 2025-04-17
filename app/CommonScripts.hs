@@ -1,4 +1,4 @@
-module Scripts where
+module CommonScripts where
 import           Data.Foldable        (minimumBy)
 import           Optics               ((^.))
 import           Scripting.Model
@@ -10,8 +10,12 @@ collectAndDropScript :: PlanetName -> PlanetName -> ShipScript
 collectAndDropScript fromPlanet toPlanet = do
     flyTo toPlanet
     dropOff Max Mc
+    dropOff Max Supplies
+    pickup (Exact 100) Neu
     flyTo fromPlanet
     pickup Max Mc
+    pickup Max Supplies
+    pickup (Exact 100) Neu
     flyTo toPlanet
 
 coloniseScript :: PlanetName -> ShipScript
@@ -68,12 +72,4 @@ coloniseWithRatiosScript homeplanet = do
     flyTo homeplanet
 
     pure ()
-
-scripts :: [(ShipId, ShipScript)]
-scripts =
-    [ (1, coloniseWithRatiosScript "Fred")
-    -- , (7, collectAndDropScript "Eeeeediot" "Van Maanan's Planet")
-    -- , (6, collectAndDropScript "Forel" "Van Maanan's Planet")
-    ]
-
 
