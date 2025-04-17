@@ -4,7 +4,7 @@ module Main where
 
 import           Api                             (currentTurn, login, update)
 import           Calcs                           (production)
-import           Control.Monad                   (void)
+import           Control.Monad                   (foldM, void)
 import           Data.Data                       (Data)
 import           Data.Dynamic                    (Typeable)
 import           Data.Map                        (empty, unions)
@@ -141,19 +141,21 @@ main = do
                     loadturn <- currentTurn apikey (show gameid)
                     let gamestate = Model.fromLoadTurnResponse loadturn
 
-                    shipScriptStates <- mapM (\(shipId, shipScript) -> do
+                    shipScriptStates <- foldM (\state (shipId, shipScript) -> do
                                 let ship = fromMaybe (error $ "Can't find ship! " <> (show shipId))
                                                      (getShipById gamestate shipId)
                                 let environment = ShipScriptEnvironment ship gamestate
-                                let (log, updates) = restoreAndRun environment shipScript
+                                let (log, updates) = restoreAndRun environment state shipScript
                                 putStrLn $ "Log: " <> show log
                                 pure updates
 
-                            ) shipScripts
+                            ) (ShipScriptState empty empty) shipScripts
 
-                    let updates = (\(ShipScriptState shipUpdates planetUpdates) -> (shipUpdates, planetUpdates)) <$> shipScriptStates
-                    let shipUpdates = unions $ (\(shipUpdates', _) -> shipUpdates') <$> updates
-                    let planetUpdates = unions $ (\(_, planetUpdates') -> planetUpdates') <$> updates
+                    -- let updates = (\(ShipScriptState shipUpdates planetUpdates) -> (shipUpdates, planetUpdates)) <$> shipScriptStates
+                    -- let shipUpdates = unions $ (\(shipUpdates', _) -> shipUpdates') <$> updates
+                    -- let planetUpdates = unions $ (\(_, planetUpdates') -> planetUpdates') <$> updates
+
+                    let (ShipScriptState shipUpdates planetUpdates) = shipScriptStates
 
                     update apikey loadturn shipUpdates planetUpdates
                     putStrLn "end"

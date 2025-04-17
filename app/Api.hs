@@ -227,6 +227,7 @@ data ShipUpdate
         { _shipUpdateShipId              :: Int
         , _shipUpdateX                   :: Maybe Int
         , _shipUpdateY                   :: Maybe Int
+        , _shipUpdateWarp                :: Maybe Int
         , _shipUpdateClans               :: Maybe Int
         , _shipUpdateMegaCredits         :: Maybe Int
         , _shipUpdateSupplies            :: Maybe Int
@@ -245,8 +246,10 @@ data ShipUpdate
         , _shipUpdateTransferMolybdenum  :: Maybe Int
         }
 
+makeLenses ''ShipUpdate
+
 defaultShipUpdate :: Int -> ShipUpdate
-defaultShipUpdate _id = ShipUpdate _id Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+defaultShipUpdate _id = ShipUpdate _id Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 data PlanetUpdate
     = PlanetUpdate
@@ -260,6 +263,8 @@ data PlanetUpdate
         , _planetUpdateMolybdenum  :: Maybe Int
         }
 
+makeLenses ''PlanetUpdate
+
 defaultPlanetUpdate :: Int -> PlanetUpdate
 defaultPlanetUpdate _id = PlanetUpdate _id Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
@@ -269,10 +274,11 @@ transferTargetType :: TransferTargetType -> Int
 transferTargetType PlanetTransferTarget = 1
 
 instance Show ShipUpdate where
-    show (ShipUpdate id' x y clans mc sup neu dur tri mol transferTargetId transferTargetType' transferClans transferMc transferSup transferNeu transferDur transferTri transferMol) =
+    show (ShipUpdate id' x y warp clans mc sup neu dur tri mol transferTargetId transferTargetType' transferClans transferMc transferSup transferNeu transferDur transferTri transferMol) =
         "Ship" <> show id' <> "=Id:::" <> show id'
         <> build "TargetX" x
         <> build "TargetY" y
+        <> build "Warp" warp
         <> build "Clans" clans
         <> build "MegaCredits" mc
         <> build "Supplies" sup
