@@ -12,30 +12,36 @@ import           Api                  (PlanetUpdate (..), ShipUpdate (..),
                                        shipUpdateMegaCredits,
                                        shipUpdateMolybdenum,
                                        shipUpdateNeutronium, shipUpdateSupplies,
+                                       shipUpdateTransferClans,
+                                       shipUpdateTransferDuranium,
+                                       shipUpdateTransferMegaCredits,
+                                       shipUpdateTransferMolybdenum,
+                                       shipUpdateTransferNeutronium,
+                                       shipUpdateTransferSupplies,
+                                       shipUpdateTransferTargetId,
+                                       shipUpdateTransferTargetType,
+                                       shipUpdateTransferTritanium,
                                        shipUpdateTritanium, transferTargetType)
 import           Control.Monad.Free   (Free (..))
 import           Control.Monad.RWS    (MonadState (get, put), ask, modify,
                                        runRWS, tell)
 import           Data.Function        ((&))
-import qualified Data.Map             as Map (adjust, alter, empty, insert,
-                                              lookup)
+import qualified Data.Map             as Map (alter, insert, lookup)
 import           Data.Maybe           (fromMaybe)
-import           Debug.Trace          (trace)
 import           Optics               (_Just, (%), (.~), (^.), (^?))
 import           Optics.Lens          (Lens')
 import           Scripting.Model      (Amount (..), Planet, Resource (..),
                                        Resources, Ship, engineId,
-                                       engineTechLevel, gamestatePlanets,
-                                       getPlanetAtShip, getPlanetByName,
-                                       hullCargo, hullFuelTank,
+                                       gamestatePlanets, getPlanetAtShip,
+                                       getPlanetByName, hullCargo, hullFuelTank,
                                        mineralsDuranium, mineralsMolybdenum,
                                        mineralsNeutronium, mineralsTritanium,
-                                       planetId, planetName, planetPosition,
-                                       planetResources, positionX, positionY,
-                                       resourcesClans, resourcesMegaCredits,
-                                       resourcesMinerals, resourcesSupplies,
-                                       shipEngine, shipHull, shipId,
-                                       shipResources)
+                                       planetId, planetName, planetOwnerId,
+                                       planetPosition, planetResources,
+                                       positionX, positionY, resourcesClans,
+                                       resourcesMegaCredits, resourcesMinerals,
+                                       resourcesSupplies, shipEngine, shipHull,
+                                       shipId, shipOwnerId, shipResources)
 import           Scripting.ShipScript (ShipScript, ShipScriptEnvironment (..),
                                        ShipScriptInstr (..),
                                        ShipScriptInstruction, ShipScriptLog,
@@ -72,42 +78,14 @@ interpretRWS (Free (Pickup amt resource next)) = do
     tell ["Pickup " <> show amt <> " " <> show resource]
     ShipScriptEnvironment ship gamestate <- ask
     case getPlanetAtShip gamestate ship of
-        Just planet -> do
-            transferTo ship planet resource amt
-            -- let (amtOnShip, amtOnPlanet) = case resource of
-            --         Clans    -> (ship ^. shipResources ^. resourcesClans, planet ^. planetResources ^. resourcesClans)
-            --         Mc       -> (ship ^. shipResources ^. resourcesMegaCredits, planet ^. planetResources ^. resourcesMegaCredits)
-            --         Supplies -> (ship ^. shipResources ^. resourcesSupplies, planet ^. planetResources ^. resourcesSupplies)
-            --         Neu      -> (ship ^. shipResources ^. resourcesMinerals ^. mineralsNeutronium, planet ^. planetResources ^. resourcesMinerals ^. mineralsNeutronium)
-            --         Dur      -> (ship ^. shipResources ^. resourcesMinerals ^. mineralsDuranium, planet ^. planetResources ^. resourcesMinerals ^. mineralsDuranium)
-            --         Tri      -> (ship ^. shipResources ^. resourcesMinerals ^. mineralsTritanium, planet ^. planetResources ^. resourcesMinerals ^. mineralsTritanium)
-            --         Mol      -> (ship ^. shipResources ^. resourcesMinerals ^. mineralsMolybdenum, planet ^. planetResources ^. resourcesMinerals ^. mineralsMolybdenum)
-            -- -- TBD - Check how much this ship can actually hold and only transfer that
-            -- let amtToTransfer = case amt of
-            --         Max        -> amtOnPlanet
-            --         Exact amt' -> min (amt' - amtOnShip) amtOnPlanet
-            -- transfer ship planet resource amtOnShip amtOnPlanet amtToTransfer
-            -- pure ()
+        Just planet -> transferTo ship planet resource amt
         Nothing     -> pure ()
     interpretRWS next
 interpretRWS (Free (DropOff amt resource next)) = do
     tell ["DropOff " <> show amt <> " " <> show resource]
     ShipScriptEnvironment ship gamestate <- ask
     case getPlanetAtShip gamestate ship of
-        Just planet -> do
-            let (amtOnShip, amtOnPlanet) = case resource of
-                    Clans    -> (ship ^. shipResources ^. resourcesClans, planet ^. planetResources ^. resourcesClans)
-                    Mc       -> (ship ^. shipResources ^. resourcesMegaCredits, planet ^. planetResources ^. resourcesMegaCredits)
-                    Supplies -> (ship ^. shipResources ^. resourcesSupplies, planet ^. planetResources ^. resourcesSupplies)
-                    Neu      -> (ship ^. shipResources ^. resourcesMinerals ^. mineralsNeutronium, planet ^. planetResources ^. resourcesMinerals ^. mineralsNeutronium)
-                    Dur      -> (ship ^. shipResources ^. resourcesMinerals ^. mineralsDuranium, planet ^. planetResources ^. resourcesMinerals ^. mineralsDuranium)
-                    Tri      -> (ship ^. shipResources ^. resourcesMinerals ^. mineralsTritanium, planet ^. planetResources ^. resourcesMinerals ^. mineralsTritanium)
-                    Mol      -> (ship ^. shipResources ^. resourcesMinerals ^. mineralsMolybdenum, planet ^. planetResources ^. resourcesMinerals ^. mineralsMolybdenum)
-            let amtToTransfer = case amt of
-                    Max        -> amtOnShip
-                    Exact amt' -> min amt' amtOnShip
-            -- transfer ship planet resource amtOnShip amtOnPlanet (-1 * amtToTransfer)
-            pure ()
+        Just planet -> transferToPlanet ship planet resource amt
         Nothing     -> pure ()
     interpretRWS next
 interpretRWS (Free (GetShip next)) = do
@@ -149,7 +127,7 @@ transferTo ship planet resource amount = do
             Tri         -> applyUpdate shipUpdate planetUpdate (resourcesMinerals % mineralsTritanium) shipUpdateTritanium planetUpdateTritanium $ Just (ship ^. shipHull ^. hullCargo - shipCurrentCargo ship)
             Mol         -> applyUpdate shipUpdate planetUpdate (resourcesMinerals % mineralsMolybdenum) shipUpdateMolybdenum planetUpdateMolybdenum $ Just (ship ^. shipHull ^. hullCargo - shipCurrentCargo ship)
 
-    trace ("after => " <> show planetUpdate') $ put $ ShipScriptState (Map.insert (ship ^. shipId) shipUpdate' shipUpdates) (Map.insert (planet ^. planetId) planetUpdate' planetUpdates)
+    put $ ShipScriptState (Map.insert (ship ^. shipId) shipUpdate' shipUpdates) (Map.insert (planet ^. planetId) planetUpdate' planetUpdates)
 
         where applyUpdate :: ShipUpdate -> PlanetUpdate -> (Lens' Resources Int) -> (Lens' ShipUpdate (Maybe Int)) -> (Lens' PlanetUpdate (Maybe Int)) -> Maybe Int -> (ShipUpdate, PlanetUpdate)
               applyUpdate shipUpdate planetUpdate resourceLens shipUpdateLens planetUpdateLens clamp =
@@ -157,96 +135,66 @@ transferTo ship planet resource amount = do
                     planetCurrent = planet ^.planetResources ^. resourceLens
                     amount' = case amount of Exact a -> a; Max -> planetCurrent
                     amt = case clamp of Nothing -> (min (amount') (planetCurrent)); Just maxAmount' -> min (maxAmount') (min (amount') (planetCurrent))
-                 in trace ("planetUpdate => " <> show planetUpdate)
+                 in
                     ( shipUpdate & shipUpdateLens .~ Just ((fromMaybe shipCurrent (shipUpdate ^. shipUpdateLens)) + amt)
                     , planetUpdate & planetUpdateLens .~ Just ((fromMaybe planetCurrent (planetUpdate ^. planetUpdateLens)) - amt)
                     )
 
-transfer :: MonadState ShipScriptState m => Ship -> Planet -> Resource -> Int -> Int -> Int -> m ()
-transfer ship planet resource amtOnShip amtOnPlanet amtToTransfer = do
-    -- One of the horriblest things i've had to write - its aweful and i promise to do this better
-    -- The api is terrible. When tranferring TO PLANETS you must set the *transfer* fields, AND NOT SEND A PLANETUPDATE
-    -- but when you are transferring from a planet TO A SHIP you send both updates, but no *transfer* fields... WTF
-    modify $ (\(ShipScriptState shipUpdates planetUpdates) ->
-                    ShipScriptState
-                        (Map.alter
-                            (\maybeExistingUpdate ->
-                                let shipUpdate = case maybeExistingUpdate of
-                                        Just existing -> existing
-                                        Nothing       -> defaultShipUpdate (ship ^. shipId)
-                                in Just $ alterShipUpdate shipUpdate
-                            )
-                            (ship ^. shipId)
-                            shipUpdates
-                        )
-                        planetUpdates
-             )
+transferToPlanet :: MonadState ShipScriptState m => Ship -> Planet -> Resource -> Amount -> m ()
+transferToPlanet ship planet resource amount = do
+    (ShipScriptState shipUpdates planetUpdates) <- get
 
-    modify $ (\(ShipScriptState shipUpdates planetUpdates) ->
-                    ShipScriptState
-                        shipUpdates
-                        (Map.alter (
-                            \maybeExistingUpdate ->
-                                let planetUpdate = case maybeExistingUpdate of
-                                        Just existing -> existing
-                                        Nothing -> defaultPlanetUpdate (planet ^. planetId)
-                                in Just $ alterPlanetUpdate planetUpdate
-                            )
-                            (planet ^. planetId)
-                            planetUpdates
-                        )
-             )
+    -- Do we already have a state update for this ship and/or planet?
+    let shipUpdate = fromMaybe (defaultShipUpdate (ship ^. shipId)) $ Map.lookup (ship ^. shipId) shipUpdates
 
-    -- If the transfer is from Ship -> Planet - then we set the "transfer target" stuff correctly
-    modify $ (\(ShipScriptState shipUpdates planetUpdates) ->
-                    ShipScriptState
-                        (Map.adjust (
-                            \shipUpdate ->
-                                if amtToTransfer < 0
-                                    then case resource of
-                                            Clans       -> shipUpdate { _shipUpdateTransferClans = Just $ (-1 * amtToTransfer), _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-                                            Mc          -> shipUpdate { _shipUpdateTransferMegaCredits = Just $ (-1 * amtToTransfer), _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-                                            Supplies    -> shipUpdate { _shipUpdateTransferSupplies = Just $ (-1 * amtToTransfer), _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-                                            Neu         -> shipUpdate { _shipUpdateTransferNeutronium = Just $ (-1 * amtToTransfer), _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-                                            Dur         -> shipUpdate { _shipUpdateTransferDuranium = Just $ (-1 * amtToTransfer), _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-                                            Tri         -> shipUpdate { _shipUpdateTransferTritanium = Just $ (-1 * amtToTransfer), _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-                                            Mol         -> shipUpdate { _shipUpdateTransferMolybdenum = Just $ (-1 * amtToTransfer), _shipUpdateTransferTargetId = Just $ planet ^. planetId, _shipUpdateTransferTargetType = Just $ transferTargetType PlanetTransferTarget }
-                                    else shipUpdate -- unchanged
-                            )
-                            (ship ^. shipId)
-                            shipUpdates
-                        )
-                        planetUpdates
-            )
+    -- Do we own this planet?
+    if (ship ^. shipOwnerId == planet ^. planetOwnerId)
+        then do
+            -- We can update ship & planet together in a fairly normal way
+            let planetUpdate = fromMaybe (defaultPlanetUpdate (planet ^. planetId)) $ Map.lookup (planet ^. planetId) planetUpdates
+            let (shipUpdate', planetUpdate') = case resource of
+                    Clans       -> applyUpdateToOwned shipUpdate planetUpdate resourcesClans shipUpdateClans planetUpdateClans
+                    Mc          -> applyUpdateToOwned shipUpdate planetUpdate resourcesMegaCredits shipUpdateMegaCredits planetUpdateMegaCredits
+                    Supplies    -> applyUpdateToOwned shipUpdate planetUpdate resourcesSupplies shipUpdateSupplies planetUpdateSupplies
+                    Neu         -> applyUpdateToOwned shipUpdate planetUpdate (resourcesMinerals % mineralsNeutronium) shipUpdateNeutronium planetUpdateNeutronium
+                    Dur         -> applyUpdateToOwned shipUpdate planetUpdate (resourcesMinerals % mineralsDuranium) shipUpdateDuranium planetUpdateDuranium
+                    Tri         -> applyUpdateToOwned shipUpdate planetUpdate (resourcesMinerals % mineralsTritanium) shipUpdateTritanium planetUpdateTritanium
+                    Mol         -> applyUpdateToOwned shipUpdate planetUpdate (resourcesMinerals % mineralsMolybdenum) shipUpdateMolybdenum planetUpdateMolybdenum
 
-    -- Delete the planet update if the transfer is towards the planet (I actually think now that this is only required if we
-    -- are NOT THE CURRENT OWNER - need to test)
-    modify $ (\(ShipScriptState shipUpdates planetUpdates) ->
-                    ShipScriptState
-                        shipUpdates
-                        (Map.alter (\planetUpdate -> if amtToTransfer < 0 then Nothing else planetUpdate)
-                            (planet ^. planetId)
-                            planetUpdates
-                        )
-            )
+            put $ ShipScriptState (Map.insert (ship ^. shipId) shipUpdate' shipUpdates) (Map.insert (planet ^. planetId) planetUpdate' planetUpdates)
 
-    where
-        alterShipUpdate update = case resource of
-            Clans       -> update { _shipUpdateClans = Just $ amtOnShip + amtToTransfer }
-            Mc          -> update { _shipUpdateMegaCredits = Just $ amtOnShip + amtToTransfer }
-            Supplies    -> update { _shipUpdateSupplies = Just $ amtOnShip + amtToTransfer }
-            Neu         -> update { _shipUpdateNeutronium = Just $ amtOnShip + amtToTransfer }
-            Dur         -> update { _shipUpdateDuranium = Just $ amtOnShip + amtToTransfer }
-            Tri         -> update { _shipUpdateTritanium = Just $ amtOnShip + amtToTransfer }
-            Mol         -> update { _shipUpdateMolybdenum = Just $ amtOnShip + amtToTransfer }
-        alterPlanetUpdate update = trace ("\n" <> show update <> "\n") $ case resource of
-            Clans       -> update { _planetUpdateClans = Just $ amtOnPlanet - amtToTransfer }
-            Mc          -> update { _planetUpdateMegaCredits = Just $ amtOnPlanet - amtToTransfer }
-            Supplies    -> update { _planetUpdateSupplies = Just $ amtOnPlanet - amtToTransfer }
-            Neu         -> update { _planetUpdateNeutronium = Just $ maybe (amtOnPlanet - amtToTransfer) (\e -> e - amtToTransfer) (_planetUpdateNeutronium update) }
-            Dur         -> update { _planetUpdateDuranium = Just $ amtOnPlanet - amtToTransfer }
-            Tri         -> update { _planetUpdateTritanium = Just $ amtOnPlanet - amtToTransfer }
-            Mol         -> update { _planetUpdateMolybdenum = Just $ amtOnPlanet - amtToTransfer }
+        else do
+            -- We cannot update the planet, but rather set the "Transfer" fields
+            let shipUpdate' = case resource of
+                    Clans       -> applyUpdateToNonOwned shipUpdate resourcesClans shipUpdateClans shipUpdateTransferClans
+                    Mc          -> applyUpdateToNonOwned shipUpdate resourcesMegaCredits shipUpdateMegaCredits shipUpdateTransferMegaCredits
+                    Supplies    -> applyUpdateToNonOwned shipUpdate resourcesSupplies shipUpdateSupplies shipUpdateTransferSupplies
+                    Neu         -> applyUpdateToNonOwned shipUpdate (resourcesMinerals % mineralsNeutronium) shipUpdateNeutronium shipUpdateTransferNeutronium
+                    Dur         -> applyUpdateToNonOwned shipUpdate (resourcesMinerals % mineralsDuranium) shipUpdateDuranium shipUpdateTransferDuranium
+                    Tri         -> applyUpdateToNonOwned shipUpdate (resourcesMinerals % mineralsTritanium) shipUpdateTritanium shipUpdateTransferTritanium
+                    Mol         -> applyUpdateToNonOwned shipUpdate (resourcesMinerals % mineralsMolybdenum) shipUpdateMolybdenum shipUpdateTransferMolybdenum
+
+            put $ ShipScriptState (Map.insert (ship ^. shipId) shipUpdate' shipUpdates) planetUpdates
+
+        where applyUpdateToOwned :: ShipUpdate -> PlanetUpdate -> (Lens' Resources Int) -> (Lens' ShipUpdate (Maybe Int)) -> (Lens' PlanetUpdate (Maybe Int)) -> (ShipUpdate, PlanetUpdate)
+              applyUpdateToOwned shipUpdate planetUpdate resourceLens shipUpdateLens planetUpdateLens  =
+                let shipCurrent = ship ^. shipResources ^. resourceLens
+                    planetCurrent = planet ^. planetResources ^. resourceLens
+                    amount' = case amount of Exact a -> min a shipCurrent; Max -> shipCurrent
+                 in
+                    ( shipUpdate & shipUpdateLens .~ Just ((fromMaybe shipCurrent (shipUpdate ^. shipUpdateLens)) - amount')
+                    , planetUpdate & planetUpdateLens .~ Just ((fromMaybe planetCurrent (planetUpdate ^. planetUpdateLens)) + amount')
+
+                    )
+              applyUpdateToNonOwned :: ShipUpdate -> (Lens' Resources Int) -> (Lens' ShipUpdate (Maybe Int)) -> (Lens' ShipUpdate (Maybe Int)) -> ShipUpdate
+              applyUpdateToNonOwned shipUpdate resourceLens shipUpdateLens shipUpdateTransferLens  =
+                let shipCurrent = ship ^. shipResources ^. resourceLens
+                    amount' = case amount of Exact a -> min a shipCurrent; Max -> shipCurrent
+                 in
+                    shipUpdate & shipUpdateLens .~ Just ((fromMaybe shipCurrent (shipUpdate ^. shipUpdateLens)) - amount')
+                               & shipUpdateTransferLens .~ Just amount'
+                               & shipUpdateTransferTargetId .~ Just (planet ^. planetId)
+                               & shipUpdateTransferTargetType .~ Just (transferTargetType PlanetTransferTarget)
 
 restore :: ShipScriptEnvironment -> ShipScriptInstruction () -> ShipScriptInstruction ()
 restore environment@(ShipScriptEnvironment ship gamestate) instr =

@@ -1,8 +1,5 @@
 module MyScripts where
 import           CommonScripts
-import           Data.Map             (Map)
-import qualified Data.Map             as Map
-import           Optics               (FoldableWithIndex (ifoldl'))
 import           Scripting.Model
 import           Scripting.ShipScript
 
@@ -40,9 +37,12 @@ scripts =
     -- :
 
     -- Basic training game
-    game 644184
-        ^-> (1 ==> collectAndDropScript "Arkham" "Fred")
-        ^-> (3 ==> collectAndDropScript "Kapteyn's Planet" "Fred")
-        ^-> (4 ==> collectAndDropScript "Serada 9" "Fred")
+    let homeplanet = "Hiperborealia"
+     in
+
+    game 644461
+        ^-> (1 ==> coloniseScript homeplanet)
+        -- ^-> (3 ==> collectAndDropScript "Kapteyn's Planet" "Fred")
+        -- ^-> (4 ==> collectAndDropScript "Serada 9" "Fred")
 
     :[]

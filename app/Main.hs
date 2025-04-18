@@ -7,23 +7,19 @@ import           Calcs                           (production)
 import           Control.Monad                   (foldM, void)
 import           Data.Data                       (Data)
 import           Data.Dynamic                    (Typeable)
-import           Data.Map                        (empty, unions)
+import           Data.Map                        (empty)
 import           Data.Maybe                      (fromMaybe)
 import           MyScripts                       (GameDef (GameDef), scripts)
 import           Optics.Operators                ((^.))
-import qualified Scripting.Model                 as Model (Gamestate,
-                                                           fromLoadTurnResponse)
-import           Scripting.Model                 (Gamestate, cargoUsed,
-                                                  getPlanetAtShip, getShipById,
+import qualified Scripting.Model                 as Model (fromLoadTurnResponse)
+import           Scripting.Model                 (cargoUsed, getShipById,
                                                   hullCargo, myPlanets, myShips,
                                                   planetName, planetNativeType,
                                                   planetResources,
                                                   resourcesClans, shipAmmo,
                                                   shipHull, shipId, shipName,
                                                   shipResources, totalResources)
-import           Scripting.ShipScript            (ShipScript,
-                                                  ShipScriptEnvironment (ShipScriptEnvironment),
-                                                  ShipScriptLog,
+import           Scripting.ShipScript            (ShipScriptEnvironment (ShipScriptEnvironment),
                                                   ShipScriptState (..))
 import           Scripting.ShipScriptInterpreter (restoreAndRun)
 import           System.Console.CmdArgs          (cmdArgsMode, cmdArgsRun, help,
@@ -135,25 +131,21 @@ main = do
             apikey <- login username password
 
             mapM_
-                (\(GameDef gameid shipScripts planetScripts) -> do
+                (\(GameDef gameid shipScripts _planetScripts) -> do
                     putStrLn $ "Running script for game " <> show gameid
 
                     loadturn <- currentTurn apikey (show gameid)
                     let gamestate = Model.fromLoadTurnResponse loadturn
 
-                    shipScriptStates <- foldM (\state (shipId, shipScript) -> do
-                                let ship = fromMaybe (error $ "Can't find ship! " <> (show shipId))
-                                                     (getShipById gamestate shipId)
+                    shipScriptStates <- foldM (\state (shipId', shipScript) -> do
+                                let ship = fromMaybe (error $ "Can't find ship! " <> (show shipId'))
+                                                     (getShipById gamestate shipId')
                                 let environment = ShipScriptEnvironment ship gamestate
-                                let (log, updates) = restoreAndRun environment state shipScript
-                                putStrLn $ "Log: " <> show log
+                                let (log', updates) = restoreAndRun environment state shipScript
+                                putStrLn $ "Log: " <> show log'
                                 pure updates
 
                             ) (ShipScriptState empty empty) shipScripts
-
-                    -- let updates = (\(ShipScriptState shipUpdates planetUpdates) -> (shipUpdates, planetUpdates)) <$> shipScriptStates
-                    -- let shipUpdates = unions $ (\(shipUpdates', _) -> shipUpdates') <$> updates
-                    -- let planetUpdates = unions $ (\(_, planetUpdates') -> planetUpdates') <$> updates
 
                     let (ShipScriptState shipUpdates planetUpdates) = shipScriptStates
 
