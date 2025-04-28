@@ -9,16 +9,17 @@ import           Data.Data                       (Data)
 import           Data.Dynamic                    (Typeable)
 import           Data.Map                        (empty)
 import           Data.Maybe                      (fromMaybe)
-import           MyScripts                       (GameDef (GameDef), scripts)
-import           Optics.Operators                ((^.))
-import qualified Scripting.Model                 as Model (fromLoadTurnResponse)
-import           Scripting.Model                 (cargoUsed, getShipById,
+import           Model                           (cargoUsed, getShipById,
                                                   hullCargo, myPlanets, myShips,
                                                   planetName, planetNativeType,
                                                   planetResources,
                                                   resourcesClans, shipAmmo,
                                                   shipHull, shipId, shipName,
                                                   shipResources, totalResources)
+import qualified Model                           as Model (fromLoadTurnResponse)
+import           MyScripts                       (GameDef (GameDef), scripts)
+import           Optics.Operators                ((^.))
+import           Production                      (productionReport)
 import           Scripting.ShipScript            (ShipScriptEnvironment (ShipScriptEnvironment),
                                                   ShipScriptState (..))
 import           Scripting.ShipScriptInterpreter (restoreAndRun)
@@ -100,36 +101,45 @@ printSummaryReport gameid = do
     pure ()
 
 data Planets
-    = Report { reportGameid :: String }
-    | Script { }
+    = RunReport { reportGameid :: String }
+    | RunProductionReport { reportGameid :: String }
+    | RunScript { }
     deriving (Show, Data, Typeable)
 
-report :: Planets
-report = Report
+runReport :: Planets
+runReport = RunReport
             { reportGameid = "641474" &= name "gameid" &= help "Id of the game" &= typ "GAMEID" }
             &= help "Display summary of planets & ships"
 
-script :: Planets
-script = Script
+runProductionReport :: Planets
+runProductionReport = RunProductionReport
+            { reportGameid = "641474" &= name "gameid" &= help "Id of the game" &= typ "GAMEID" }
+            &= help "Display production report of planets"
+
+runScript :: Planets
+runScript = RunScript
             { }
             &= help "Display summary of planets & ships"
 
 main :: IO ()
 main = do
     mode <- cmdArgsRun $ cmdArgsMode
-                    (modes [report, script]
+                    (modes [runReport, runProductionReport, runScript]
                         &= help "Planets tool"
                         &= program "planets"
                         &= summary "Planets Tool v0.1 (by drshade)"
                     )
 
+    (username, password) <- readCredential
+    apikey <- login username password
+
     case mode of
-        Report gameid -> printSummaryReport gameid
-        Script -> do
-
-            (username, password) <- readCredential
-            apikey <- login username password
-
+        RunReport gameid -> printSummaryReport gameid
+        RunProductionReport gameid -> do
+            turn <- currentTurn apikey gameid
+            let gamestate = Model.fromLoadTurnResponse turn
+            productionReport gamestate
+        RunScript -> do
             mapM_
                 (\(GameDef gameid shipScripts _planetScripts) -> do
                     putStrLn $ "Running script for game " <> show gameid

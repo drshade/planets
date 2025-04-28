@@ -1,7 +1,7 @@
 module CommonScripts where
 import           Data.Foldable        (minimumBy)
+import           Model
 import           Optics               ((^.))
-import           Scripting.Model
 import           Scripting.ShipScript
 
 type PlanetName = String
@@ -30,7 +30,7 @@ coloniseScript homeplanet = do
     ship <- getShip
 
     -- Fly to nearest unowned planet
-    nearestPlanet <- minimumBy (\p1 p2 -> compare (distance ship p1) (distance ship p2))
+    nearestPlanet <- minimumBy (\p1 p2 -> compare (manhattanDistance ship p1) (manhattanDistance ship p2))
                         <$> filter (\p -> p ^. planetOwnerId == 0)
                         <$> getPlanets
     flyTo (nearestPlanet ^. planetName)
@@ -58,7 +58,7 @@ coloniseWithRatiosScript homeplanet = do
     pickup (Exact 100) Neu
 
     -- Fly to nearest unowned planet
-    nearestPlanet <- minimumBy (\p1 p2 -> compare (distance ship p1) (distance ship p2))
+    nearestPlanet <- minimumBy (\p1 p2 -> compare (manhattanDistance ship p1) (manhattanDistance ship p2))
                         <$> filter (\p -> p ^. planetOwnerId == 0)
                         <$> getPlanets
     flyTo (nearestPlanet ^. planetName)

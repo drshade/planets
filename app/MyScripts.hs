@@ -1,6 +1,6 @@
 module MyScripts where
 import           CommonScripts
-import           Scripting.Model
+import           Model
 import           Scripting.ShipScript
 
 -- To move to PlanetsScripting one day
@@ -35,6 +35,10 @@ scripts =
     -- game 643510
     --     ^-> (1 ==> coloniseWithRatiosScript "Frank")
     -- :
+
+    -- Lets try this thing
+    -- game 643598
+
 
     -- Basic training game
     let homeplanet = "Hiperborealia"

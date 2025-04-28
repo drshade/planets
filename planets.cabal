@@ -63,12 +63,13 @@ executable planets
 
     -- Modules included in this executable, other than Main.
     other-modules:    Api
+                    , Model
                     , Calcs
                     , CommonScripts
                     , MyScripts
-                    , Scripting.Model
                     , Scripting.ShipScript
                     , Scripting.ShipScriptInterpreter
+                    , Production
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions: TemplateHaskell, DeriveGeneric
@@ -82,6 +83,7 @@ executable planets
                     , optics
                     , astar
                     , cmdargs
+                    , pretty-terminal
 
 
     -- Directories containing source files.

@@ -98,46 +98,51 @@ makeLenses ''Hull
 deriveJSON defaultOptions { fieldLabelModifier = fmap toLower . drop (length "_hull") } ''Hull
 
 data Planet = Planet
-    { _planetName              :: String
-    , _planetId                :: Int
-    , _planetOwnerId           :: Int
-    , _planetX                 :: Int
-    , _planetY                 :: Int
-    , _planetMines             :: Int
-    , _planetFactories         :: Int
-    , _planetDefense           :: Int
-    , _planetMegaCredits       :: Int
-    , _planetSupplies          :: Int
-    , _planetSuppliesSold      :: Int
-    , _planetNeutronium        :: Int
-    , _planetMolybdenum        :: Int
-    , _planetDuranium          :: Int
-    , _planetTritanium         :: Int
-    , _planetGroundNeutronium  :: Int
-    , _planetGroundMolybdenum  :: Int
-    , _planetGroundDuranium    :: Int
-    , _planetGroundTritanium   :: Int
-    , _planetDensityNeutronium :: Int
-    , _planetDensityMolybdenum :: Int
-    , _planetDensityDuranium   :: Int
-    , _planetDensityTritanium  :: Int
-    , _planetTotalNeutronium   :: Int
-    , _planetTotalMolybdenum   :: Int
-    , _planetTotalDuranium     :: Int
-    , _planetTotalTritanium    :: Int
-    , _planetCheckNeutronium   :: Int
-    , _planetCheckMolybdenum   :: Int
-    , _planetCheckDuranium     :: Int
-    , _planetCheckTritanium    :: Int
-    , _planetCheckMegaCredits  :: Int
-    , _planetCheckSupplies     :: Int
-    , _planetClans             :: Int
-    , _planetColonistTaxRate   :: Int
-    , _planetNativeClans       :: Int
-    , _planetNativeType        :: Int
-    , _planetNativeTaxRate     :: Int
-    , _planetNativeTaxValue    :: Int
-    , _planetNativeGovernment  :: Int
+    { _planetName                :: String
+    , _planetId                  :: Int
+    , _planetOwnerId             :: Int
+    , _planetTemp                :: Int
+    , _planetX                   :: Int
+    , _planetY                   :: Int
+    , _planetMines               :: Int
+    , _planetFactories           :: Int
+    , _planetDefense             :: Int
+    , _planetMegaCredits         :: Int
+    , _planetSupplies            :: Int
+    , _planetSuppliesSold        :: Int
+    , _planetNeutronium          :: Int
+    , _planetMolybdenum          :: Int
+    , _planetDuranium            :: Int
+    , _planetTritanium           :: Int
+    , _planetGroundNeutronium    :: Int
+    , _planetGroundMolybdenum    :: Int
+    , _planetGroundDuranium      :: Int
+    , _planetGroundTritanium     :: Int
+    , _planetDensityNeutronium   :: Int
+    , _planetDensityMolybdenum   :: Int
+    , _planetDensityDuranium     :: Int
+    , _planetDensityTritanium    :: Int
+    , _planetTotalNeutronium     :: Int
+    , _planetTotalMolybdenum     :: Int
+    , _planetTotalDuranium       :: Int
+    , _planetTotalTritanium      :: Int
+    , _planetCheckNeutronium     :: Int
+    , _planetCheckMolybdenum     :: Int
+    , _planetCheckDuranium       :: Int
+    , _planetCheckTritanium      :: Int
+    , _planetCheckMegaCredits    :: Int
+    , _planetCheckSupplies       :: Int
+    , _planetClans               :: Int
+    , _planetColonistTaxRate     :: Int
+    , _planetColonistHappyPoints :: Int
+    , _planetColHappyChange      :: Int
+    , _planetNativeClans         :: Int
+    , _planetNativeType          :: Int
+    , _planetNativeTaxRate       :: Int
+    , _planetNativeTaxValue      :: Int
+    , _planetNativeGovernment    :: Int
+    , _planetNativeHappyPoints   :: Int
+    , _planetNativeHappyChange   :: Int
     } deriving (Show)
 
 makeLenses ''Planet
@@ -161,14 +166,28 @@ data Player = Player
 makeLenses ''Player
 deriveJSON defaultOptions { fieldLabelModifier = fmap toLower . drop (length "_player") } ''Player
 
+data Starbase = Starbase
+    { _starbaseId              :: Int
+    , _starbasePlanetId        :: Int
+    , _starbaseEngineTechLevel :: Int
+    , _starbaseHullTechLevel   :: Int
+    , _starbaseBeamTechLevel   :: Int
+    , _starbaseTorpTechLevel   :: Int
+    , _starbaseFighters        :: Int
+    } deriving (Show)
+
+makeLenses ''Starbase
+deriveJSON defaultOptions { fieldLabelModifier = fmap toLower . drop (length "_starbase") } ''Starbase
+
 data Rst = Rst
-    { _rstGame    :: Game
-    , _rstPlayer  :: Player
-    , _rstPlayers :: [Player]
-    , _rstShips   :: [Ship]
-    , _rstPlanets :: [Planet]
-    , _rstHulls   :: [Hull]
-    , _rstEngines :: [Engine]
+    { _rstGame      :: Game
+    , _rstPlayer    :: Player
+    , _rstPlayers   :: [Player]
+    , _rstShips     :: [Ship]
+    , _rstPlanets   :: [Planet]
+    , _rstHulls     :: [Hull]
+    , _rstEngines   :: [Engine]
+    , _rstStarbases :: [Starbase]
     } deriving (Show)
 
 makeLenses ''Rst
@@ -197,7 +216,7 @@ fetch url = do
             P.error $ "Non-200 response returned... implement this! -> " ++ body
         else do
             let body :: String = LChar8.unpack $ responseBody resp
-            -- putStrLn $ "Response: " ++ body
+            putStrLn $ "Response: " ++ body
             -- First check if it's an error by decoding the response
             let errorResponse = decode (LChar8.pack body) :: Maybe ErrorResponse
             case errorResponse of
@@ -342,7 +361,7 @@ update apikey loadturn shipUpdates planetUpdates = do
             P.error $ "Non-200 response returned... implement this! -> " ++ body
         else do
             let body :: String = LChar8.unpack $ responseBody resp
-            putStrLn $ "Response: " ++ body
+            -- putStrLn $ "Response: " ++ body
             -- First check if it's an error by decoding the response
             let errorResponse = decode (LChar8.pack body) :: Maybe ErrorResponse
             case errorResponse of

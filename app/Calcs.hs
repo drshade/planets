@@ -1,14 +1,13 @@
 module Calcs where
-import           Optics          (Lens', (^.))
-import           Scripting.Model (Minerals (..), NativeType (..), Planet,
-                                  Race (..), Resources (..), mineralsDuranium,
-                                  mineralsMolybdenum, mineralsNeutronium,
-                                  mineralsTritanium, planetColonistTaxRate,
-                                  planetDensityMinerals, planetFactories,
-                                  planetGroundMinerals, planetMines,
-                                  planetNativeClans, planetNativeTaxRate,
-                                  planetNativeTaxValue, planetNativeType,
-                                  planetResources, resourcesClans)
+import           Model  (Minerals (..), NativeType (..), Planet, Race (..),
+                         Resources (..), mineralsDuranium, mineralsMolybdenum,
+                         mineralsNeutronium, mineralsTritanium,
+                         planetColonistTaxRate, planetDensityMinerals,
+                         planetFactories, planetGroundMinerals, planetMines,
+                         planetNativeClans, planetNativeTaxRate,
+                         planetNativeTaxValue, planetNativeType,
+                         planetResources, resourcesClans)
+import           Optics (Lens', (^.))
 
 production :: Planet -> Resources
 production planet =
@@ -63,6 +62,13 @@ production planet =
 type TorpedoTechLevel = Int
 type Lightyears = Int
 
+-- "Mark 3c Photon" => tech 4
+-- "Mark 4 Photon"  => tech 5
+-- "Heavy Proton+"  => tech 6
+-- "Mark 6c Photon" => tech 7
+-- "Mark 7 Photon"  => tech 8
+-- "Mark 8 Photon"  => tech 10
+-- "Quantum Torp"   => tech 10
 torpsForMinefieldSize :: Race -> TorpedoTechLevel -> Lightyears -> Int
 torpsForMinefieldSize race techlevel lys =
     let minesPerTorp = techlevel ^ (2 :: Int) * (case race of Robots -> 4; _ -> 1)

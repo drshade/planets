@@ -1,8 +1,9 @@
-module Scripting.Model where
+module Model where
 import qualified Api
+import           Data.List   (sortOn)
 import           Data.Map    (Map)
 import qualified Data.Map    as Map (fromList, lookup)
-import           Data.Maybe  (fromMaybe, listToMaybe)
+import           Data.Maybe  (fromMaybe, isJust, listToMaybe)
 import           Data.Tuple  (swap)
 import           Optics      (makeLenses, (^.))
 import           Text.Printf (printf)
@@ -113,35 +114,51 @@ data Engine = Engine
     , _engineTechLevel :: Int
     } deriving (Show)
 
+data Starbase = Starbase
+    { _starbaseId               :: Int
+    , _starbaseEngineTechLevel  :: Int
+    , _starbaseBeamTechLevel    :: Int
+    , _starbaseHullTechLevel    :: Int
+    , _starbaseTorpedoTechLevel :: Int
+    , _starbaseFighters         :: Int
+    } deriving (Show)
+
 data Planet = Planet
-    { _planetName             :: String
-    , _planetId               :: PlanetId
-    , _planetOwnerId          :: Int
-    , _planetPosition         :: Position
-    , _planetMines            :: Int
-    , _planetFactories        :: Int
-    , _planetDefense          :: Int
-    , _planetResources        :: Resources
-    , _planetGroundMinerals   :: Minerals
-    , _planetDensityMinerals  :: Minerals
-    , _planetTotalMinerals    :: Minerals
-    , _planetColonistTaxRate  :: Int
-    , _planetNativeClans      :: Int
-    , _planetNativeType       :: NativeType
-    , _planetNativeGovernment :: GovtType
-    , _planetNativeTaxRate    :: Int
-    , _planetNativeTaxValue   :: Int
+    { _planetName                  :: String
+    , _planetId                    :: PlanetId
+    , _planetOwnerId               :: Int
+    , _planetTemperature           :: Int
+    , _planetPosition              :: Position
+    , _planetMines                 :: Int
+    , _planetFactories             :: Int
+    , _planetDefense               :: Int
+    , _planetResources             :: Resources
+    , _planetGroundMinerals        :: Minerals
+    , _planetDensityMinerals       :: Minerals
+    , _planetTotalMinerals         :: Minerals
+    , _planetCheckMinerals         :: Minerals
+    , _planetColonistTaxRate       :: Int
+    , _planetColonistHappiness     :: Int
+    , _planetColonistHappinessRate :: Int
+    , _planetNativeClans           :: Int
+    , _planetNativeType            :: NativeType
+    , _planetNativeGovernment      :: GovtType
+    , _planetNativeTaxRate         :: Int
+    , _planetNativeTaxValue        :: Int
+    , _planetNativeHappiness       :: Int
+    , _planetNativeHappinessRate   :: Int
+    , _planetStarbase              :: Maybe Starbase
     } deriving (Show)
 
 data Race
     = Feds | Lizards | Birds | Hoards | Privateers | Cyborgs | Crystals
-    | Empire | Robots | Colonies | Plague
+    | Empire | Robots | Rebels | Colonies | Plague
     deriving (Show, Eq, Ord)
 
 raceEnumMap :: [(Race, Int)]
 raceEnumMap =
-    [ (Feds, 0), (Lizards, 1), (Birds, 2), (Hoards, 3), (Privateers, 4), (Cyborgs, 5), (Crystals, 6)
-    , (Empire, 7), (Robots, 8), (Colonies, 9), (Plague, 10)
+    [ (Feds, 1), (Lizards, 2), (Birds, 3), (Hoards, 4), (Privateers, 5), (Cyborgs, 6), (Crystals, 7)
+    , (Empire, 8), (Robots, 9), (Rebels, 10), (Colonies, 11), (Plague, 12)
     ]
 
 instance Enum Race where
@@ -310,6 +327,7 @@ fromLoadTurnResponse loadturn =
                 { _planetName             = p ^. Api.planetName
                 , _planetId               = p ^. Api.planetId
                 , _planetOwnerId          = p ^. Api.planetOwnerId
+                , _planetTemperature      = p ^. Api.planetTemp
                 , _planetPosition         = Position (p ^. Api.planetX) (p ^. Api.planetY)
                 , _planetMines            = p ^. Api.planetMines
                 , _planetFactories        = p ^. Api.planetFactories
@@ -343,12 +361,23 @@ fromLoadTurnResponse loadturn =
                     , _mineralsDuranium   = p ^. Api.planetTotalDuranium
                     , _mineralsTritanium  = p ^. Api.planetTotalTritanium
                     }
+                , _planetCheckMinerals = Minerals
+                    { _mineralsNeutronium = p ^. Api.planetCheckNeutronium
+                    , _mineralsMolybdenum = p ^. Api.planetCheckMolybdenum
+                    , _mineralsDuranium   = p ^. Api.planetCheckDuranium
+                    , _mineralsTritanium  = p ^. Api.planetCheckTritanium
+                    }
                 , _planetColonistTaxRate  = p ^. Api.planetColonistTaxRate
+                , _planetColonistHappiness  = p ^. Api.planetColonistHappyPoints
+                , _planetColonistHappinessRate = p ^. Api.planetColHappyChange
                 , _planetNativeClans      = p ^. Api.planetNativeClans
                 , _planetNativeType       = toEnum $ p ^. Api.planetNativeType
                 , _planetNativeGovernment = toEnum $ p ^. Api.planetNativeGovernment
                 , _planetNativeTaxRate    = p ^. Api.planetNativeTaxRate
                 , _planetNativeTaxValue   = p ^. Api.planetNativeTaxValue
+                , _planetNativeHappiness  = p ^. Api.planetNativeHappyPoints
+                , _planetNativeHappinessRate = p ^. Api.planetNativeHappyChange
+                , _planetStarbase        = mapStarbase (loadturn ^. Api.loadturnRst ^. Api.rstStarbases) (p ^. Api.planetId)
                 }
             )
             <$> loadturn ^. Api.loadturnRst ^. Api.rstPlanets
@@ -393,6 +422,17 @@ fromLoadTurnResponse loadturn =
                 , (8, engine ^. Api.engineWarp8)
                 , (9, engine ^. Api.engineWarp9)
                 ]
+        mapStarbase :: [Api.Starbase] -> Int -> Maybe Starbase
+        mapStarbase starbases planetId' =
+            (\starbase -> Starbase
+                { _starbaseId               = starbase ^. Api.starbaseId
+                , _starbaseEngineTechLevel  = starbase ^. Api.starbaseEngineTechLevel
+                , _starbaseBeamTechLevel    = starbase ^. Api.starbaseBeamTechLevel
+                , _starbaseHullTechLevel    = starbase ^. Api.starbaseHullTechLevel
+                , _starbaseTorpedoTechLevel = starbase ^. Api.starbaseTorpTechLevel
+                , _starbaseFighters         = starbase ^. Api.starbaseFighters
+                }
+            ) <$> (listToMaybe $ filter (\s -> s ^. Api.starbasePlanetId == planetId') starbases)
 
 getShipById :: Gamestate -> Int -> Maybe Ship
 getShipById gamestate id' =
@@ -422,16 +462,34 @@ myPlanets gamestate =
     let myId = gamestate ^. gamestatePlayer ^. playerId
      in filter (\p -> p ^. planetOwnerId == myId) (gamestate ^. gamestatePlanets)
 
+myPlanetsWithBase :: Gamestate -> [Planet]
+myPlanetsWithBase = filter (\p -> isJust $ p ^. planetStarbase) . myPlanets
+
 myShips :: Gamestate -> [Ship]
 myShips gamestate =
     let myId = gamestate ^. gamestatePlayer ^. playerId
      in filter (\s -> s ^. shipOwnerId == myId) (gamestate ^. gamestateShips)
 
-distance :: HasPosition a => HasPosition b => a -> b -> Int
-distance p1 p2 =
+-- Manhattan distance - not ideal
+manhattanDistance :: HasPosition a => HasPosition b => a -> b -> Int
+manhattanDistance p1 p2 =
     let (x1, y1) = position p1
         (x2, y2) = position p2
      in abs (x1 - x2) + abs (y1 - y2)
+
+-- Euclidean distance
+distance :: HasPosition a => HasPosition b => a -> b -> Double
+distance p1 p2 =
+    let (x1, y1) = position p1
+        (x2, y2) = position p2
+     in sqrt $ fromIntegral ((x1 - x2) ^ 2 + (y1 - y2) ^ 2)
+
+-- Stuff within a certain range within range and return sorted by distance
+withinRange :: HasPosition a => [a] -> a -> Double -> [a]
+withinRange points point range =
+    sortOn (\a -> distance point a)
+  $ filter (\p -> let d = distance p point in d > 0 && d < range)
+  $ points
 
 totalResources :: HasResources a => [a] -> Resources
 totalResources =

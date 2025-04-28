@@ -3,7 +3,7 @@ import           Api                (PlanetUpdate, ShipUpdate)
 import           Control.Monad.Free (Free, liftF)
 import           Control.Monad.RWS  (RWS)
 import           Data.Map           (Map)
-import           Scripting.Model
+import           Model
 
 data ShipScriptEnvironment = ShipScriptEnvironment Ship Gamestate
 type ShipScriptLog = [String]

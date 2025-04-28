@@ -28,9 +28,7 @@ import           Control.Monad.RWS    (MonadState (get, put), ask, modify,
 import           Data.Function        ((&))
 import qualified Data.Map             as Map (alter, insert, lookup)
 import           Data.Maybe           (fromMaybe)
-import           Optics               (_Just, (%), (.~), (^.), (^?))
-import           Optics.Lens          (Lens')
-import           Scripting.Model      (Amount (..), Planet, Resource (..),
+import           Model                (Amount (..), Planet, Resource (..),
                                        Resources, Ship, engineId,
                                        gamestatePlanets, getPlanetAtShip,
                                        getPlanetByName, hullCargo, hullFuelTank,
@@ -42,6 +40,8 @@ import           Scripting.Model      (Amount (..), Planet, Resource (..),
                                        resourcesMegaCredits, resourcesMinerals,
                                        resourcesSupplies, shipEngine, shipHull,
                                        shipId, shipOwnerId, shipResources)
+import           Optics               (_Just, (%), (.~), (^.), (^?))
+import           Optics.Lens          (Lens')
 import           Scripting.ShipScript (ShipScript, ShipScriptEnvironment (..),
                                        ShipScriptInstr (..),
                                        ShipScriptInstruction, ShipScriptLog,
