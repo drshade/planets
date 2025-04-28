@@ -2,9 +2,8 @@ module Production where
 
 import           Model                 (Gamestate, Minerals,
                                         NativeType (Amorphous, Bovinoid, Insectoid),
-                                        Planet (_planetColonistHappinessRate),
-                                        Race (..), distance, gamestatePlayer,
-                                        manhattanDistance, mineralsDuranium,
+                                        Planet, Race (..), distance,
+                                        gamestatePlayer, mineralsDuranium,
                                         mineralsMolybdenum, mineralsNeutronium,
                                         mineralsTritanium, myPlanets,
                                         myPlanetsWithBase,
@@ -19,14 +18,12 @@ import           Model                 (Gamestate, Minerals,
                                         planetNativeTaxRate,
                                         planetNativeTaxValue, planetNativeType,
                                         planetResources, planetTemperature,
-                                        planetTotalMinerals, playerRace,
-                                        resourcesClans, resourcesMegaCredits,
-                                        resourcesMinerals, resourcesSupplies,
-                                        withinRange)
+                                        playerRace, resourcesClans,
+                                        resourcesMegaCredits, resourcesMinerals,
+                                        resourcesSupplies, withinRange)
 import           Optics                ((^.))
 import           Optics.Lens           (Lens')
-import           System.Console.Pretty (Color (..), Style (..), bgColor, color,
-                                        style, supportsPretty)
+import           System.Console.Pretty (Color (..), color)
 import           Text.Printf           (printf)
 
 percent :: Int -> Double
@@ -65,7 +62,7 @@ colonistMaximumPopulation race temperature
     -- Everyone else
     | temperature > 84  = floor $ ((20099.9 :: Double) - (200 * fromIntegral temperature)) / 10
     | temperature < 15  = floor $ ((299.9 :: Double) + (200 * fromIntegral temperature)) / 10
-    | otherwise         = round $ sin (3.14 * (100 - fromIntegral temperature) / 100) * 100000
+    | otherwise         = round $ sin (3.14 * (100 - fromIntegral temperature) / 100 :: Double) * 100000
 
 maximumMines :: Int -> Int
 maximumMines colonistClans
@@ -128,7 +125,7 @@ productionReport gamestate = do
             let currentNativesTax = nativesTax (planet' ^. planetNativeType) (planet' ^. planetResources ^. resourcesClans) (planet' ^. planetNativeClans) (planet' ^. planetNativeTaxValue) (planet' ^. planetNativeTaxRate)
 
             let potentialColonistTax = colonistTaxes myRace (planet' ^. planetResources ^. resourcesClans) (planet' ^. planetColonistHappiness) (planet' ^. planetColonistTaxRate + planet' ^. planetColonistHappinessRate)
-            let potentialColonistTaxWithGrowth = colonistTaxes myRace maxColonistPopulation (planet' ^. planetColonistHappiness) (planet' ^. planetColonistTaxRate + planet' ^. planetColonistHappinessRate)
+            let _potentialColonistTaxWithGrowth = colonistTaxes myRace maxColonistPopulation (planet' ^. planetColonistHappiness) (planet' ^. planetColonistTaxRate + planet' ^. planetColonistHappinessRate)
 
             let potentialNativesTax = nativesTax (planet' ^. planetNativeType) (maxColonistPopulation) (planet' ^. planetNativeClans) (planet' ^. planetNativeTaxValue) (planet' ^. planetNativeTaxRate + planet' ^. planetNativeHappinessRate)
 
@@ -175,7 +172,7 @@ productionReport gamestate = do
                 item "Mo" mineralsMolybdenum
             where
                 productionNextTurn lens' = min (ground ^. lens') (mines * (density ^. lens') `div` 100)
-                productionNextTurns turns lens' = min (ground ^. lens') (productionNextTurn lens' * turns)
+                _productionNextTurns turns lens' = min (ground ^. lens') (productionNextTurn lens' * turns)
                 productionMaximum numclans lens' = min (ground ^. lens') (maximumMines numclans * (density ^. lens') `div` 100)
 
                 item :: String -> Lens' Minerals Int -> String

@@ -482,7 +482,7 @@ distance :: HasPosition a => HasPosition b => a -> b -> Double
 distance p1 p2 =
     let (x1, y1) = position p1
         (x2, y2) = position p2
-     in sqrt $ fromIntegral ((x1 - x2) ^ 2 + (y1 - y2) ^ 2)
+     in sqrt $ fromIntegral ((x1 - x2) ^ (2 :: Int) + (y1 - y2) ^ (2 :: Int))
 
 -- Stuff within a certain range within range and return sorted by distance
 withinRange :: HasPosition a => [a] -> a -> Double -> [a]

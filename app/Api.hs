@@ -216,7 +216,7 @@ fetch url = do
             P.error $ "Non-200 response returned... implement this! -> " ++ body
         else do
             let body :: String = LChar8.unpack $ responseBody resp
-            putStrLn $ "Response: " ++ body
+            -- putStrLn $ "Response: " ++ body
             -- First check if it's an error by decoding the response
             let errorResponse = decode (LChar8.pack body) :: Maybe ErrorResponse
             case errorResponse of
