@@ -87,16 +87,16 @@ productionReport gamestate = do
         base :: Planet -> IO ()
         base basePlanet = do
             putStrLn $ "------------------------------------------"
-            putStrLn $ "🛰️ Starbase ->"
-            planet basePlanet
-            putStrLn $ ""
-            let closestPlanets = withinRange (myPlanets gamestate) basePlanet 162
-            putStrLn $ "Closest planets -> " ++ show (length closestPlanets)
-            mapM_ planet closestPlanets
+            putStrLn $ "🛰️ Starbase " ++ (basePlanet ^. planetName) ++ " ->"
             putStrLn $ "------------------------------------------"
+            planet basePlanet basePlanet
+            let closestPlanets = withinRange (myPlanets gamestate) basePlanet 162
+            mapM_ (planet basePlanet) closestPlanets
+            putStrLn $ "------------------------------------------"
+            putStrLn ""
 
-        planet :: Planet -> IO ()
-        planet planet' = do
+        planet :: Planet -> Planet -> IO ()
+        planet basePlanet planet' = do
             -- Potential taxes if we set happiness growth to 0% & maximum population
             let currentColonistPopulation = planet' ^. planetResources ^. resourcesClans
             let maxColonistPopulation = colonistMaximumPopulation myRace (planet' ^. planetTemperature)
@@ -118,7 +118,9 @@ productionReport gamestate = do
                 ++ " ("
                 ++ printf "%3d" (maximumFactories maxColonistPopulation)
                 ++ "↑) factories"
-                ++ "]"
+                ++ "] - "
+                ++ printf "%3.1f" (distance basePlanet planet')
+                ++ "ly away"
 
             -- TAXES
             let currentColonistTax = colonistTaxes myRace (planet' ^. planetResources ^. resourcesClans) (planet' ^. planetColonistHappiness) (planet' ^. planetColonistTaxRate)
