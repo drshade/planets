@@ -20,8 +20,9 @@ import           Model                 (Gamestate, Minerals,
                                         planetNativeTaxValue, planetNativeType,
                                         planetResources, planetTemperature,
                                         planetTotalMinerals, playerRace,
-                                        resourcesClans, resourcesMinerals,
-                                        resourcesSupplies, withinRange)
+                                        resourcesClans, resourcesMegaCredits,
+                                        resourcesMinerals, resourcesSupplies,
+                                        withinRange)
 import           Optics                ((^.))
 import           Optics.Lens           (Lens')
 import           System.Console.Pretty (Color (..), Style (..), bgColor, color,
@@ -131,23 +132,33 @@ productionReport gamestate = do
 
             let potentialNativesTax = nativesTax (planet' ^. planetNativeType) (maxColonistPopulation) (planet' ^. planetNativeClans) (planet' ^. planetNativeTaxValue) (planet' ^. planetNativeTaxRate + planet' ^. planetNativeHappinessRate)
 
-            putStrLn $ "Colonist tax: " ++ printf "%4d" currentColonistTax ++
-                if currentColonistTax /= potentialColonistTax
-                    then color Yellow $ " (potential: " ++ printf "%4d" potentialColonistTax ++ " - pop " ++ printf "%d" (planet' ^. planetResources ^. resourcesClans) ++ " / " ++ printf "%d" maxColonistPopulation ++ ")"
-                    else ""
-            putStrLn $ "Natives tax : " ++ printf "%4d" currentNativesTax ++
-                if currentNativesTax /= potentialNativesTax
-                    then color Red $ " (potential: " ++ printf "%4d" potentialNativesTax ++ " - pop " ++ show (planet' ^. planetNativeClans) ++ ")"
-                    else ""
+            -- MegaCredits
+            putStrLn $ "MegaCredits : "
+                    ++ printf "%4d" (planet' ^. planetResources ^. resourcesMegaCredits)
+                    ++ " -> "
+                    ++ printf "%4d" (currentColonistTax + currentNativesTax)
+                    ++ " next"
+                    ++ " (" ++ printf "%4d" currentColonistTax
+                    ++ (if currentColonistTax /= potentialColonistTax
+                            then color Yellow $ printf "%4d↑" potentialColonistTax
+                            else "")
+                    ++ " from colonists + "
+                    ++ printf "%4d" currentNativesTax
+                    ++ (if currentNativesTax /= potentialNativesTax
+                            then color Yellow $ printf "%4d↑" potentialNativesTax
+                            else "")
+                    ++ " from natives)"
 
             -- Supplies
-            putStrLn $ "Supplies    : " ++ printf "%4d" (planet' ^. planetResources ^. resourcesSupplies)
+            putStrLn $ "Supplies    : "
+                    ++ printf "%4d" (planet' ^. planetResources ^. resourcesSupplies)
+                    ++ " -> "
                     ++ case (planet' ^. planetNativeType) of
                             Bovinoid ->
                                 let extras :: Int
                                     extras = min (currentColonistPopulation) (round $ (fromIntegral (planet' ^. planetNativeClans) / 100 :: Double))
-                                 in color Green $ " (" ++ printf "%4d" (planet' ^. planetFactories + extras) ++ " per turn - Bovinoid bonus = " ++ printf "%4d" extras ++ ")"
-                            _ -> " (" ++ printf "%4d" (planet' ^. planetFactories) ++ " per turn)"
+                                 in color Green $ printf "%4d" (planet' ^. planetFactories + extras) ++ " next - Bovinoid bonus = " ++ printf "%4d" extras
+                            _ -> printf "%4d" (planet' ^. planetFactories) ++ " next"
 
 
             -- MINERALS & MINING
