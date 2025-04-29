@@ -6,7 +6,6 @@ import           Api                             (currentTurn, login, update)
 import           Calcs                           (production)
 import           Control.Monad                   (foldM, void)
 import           Data.Data                       (Data)
-import           Data.Dynamic                    (Typeable)
 import           Data.Map                        (empty)
 import           Data.Maybe                      (fromMaybe)
 import           Model                           (cargoUsed, getShipById,
@@ -104,7 +103,7 @@ data Planets
     = RunReport { reportGameid :: String }
     | RunProductionReport { reportGameid :: String }
     | RunScript { }
-    deriving (Show, Data, Typeable)
+    deriving (Show, Data)
 
 runReport :: Planets
 runReport = RunReport

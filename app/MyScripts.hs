@@ -39,14 +39,13 @@ scripts =
     -- Lets try this thing
     -- game 643598
 
-
     -- Basic training game
     let homeplanet = "Hiperborealia"
      in
 
     game 644461
         ^-> (1 ==> coloniseScript homeplanet)
-        -- ^-> (3 ==> collectAndDropScript "Kapteyn's Planet" "Fred")
-        -- ^-> (4 ==> collectAndDropScript "Serada 9" "Fred")
+        ^-> (3 ==> collectAndDropScript "Kapteyn's Planet" homeplanet)
+        ^-> (4 ==> collectAndDropScript "Serada 9" homeplanet)
 
     :[]
