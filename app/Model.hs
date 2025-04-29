@@ -16,7 +16,6 @@ type PlanetId = Int
 data Amount = Max | Exact Int deriving (Show)
 data Resource = Mc | Supplies | Clans | Neu | Dur | Tri | Mol deriving (Show)
 
-
 data Minerals = Minerals
     { _mineralsNeutronium :: Int
     , _mineralsMolybdenum :: Int
@@ -131,7 +130,7 @@ data Planet = Planet
     , _planetPosition              :: Position
     , _planetMines                 :: Int
     , _planetFactories             :: Int
-    , _planetDefense               :: Int
+    , _planetDefenses              :: Int
     , _planetResources             :: Resources
     , _planetGroundMinerals        :: Minerals
     , _planetDensityMinerals       :: Minerals
@@ -331,7 +330,7 @@ fromLoadTurnResponse loadturn =
                 , _planetPosition         = Position (p ^. Api.planetX) (p ^. Api.planetY)
                 , _planetMines            = p ^. Api.planetMines
                 , _planetFactories        = p ^. Api.planetFactories
-                , _planetDefense          = p ^. Api.planetDefense
+                , _planetDefenses          = p ^. Api.planetDefense
                 , _planetResources        = Resources
                     { _resourcesMegaCredits = p ^. Api.planetMegaCredits
                     , _resourcesSupplies    = p ^. Api.planetSupplies
@@ -435,27 +434,20 @@ fromLoadTurnResponse loadturn =
             ) <$> (listToMaybe $ filter (\s -> s ^. Api.starbasePlanetId == planetId') starbases)
 
 getShipById :: Gamestate -> Int -> Maybe Ship
-getShipById gamestate id' =
-    case filter (\s -> s ^. shipId == id') (gamestate ^. gamestateShips) of
-        []    -> Nothing
-        (s:_) -> Just s -- can really only be one
+getShipById gamestate id' = listToMaybe $ filter (\s -> s ^. shipId == id') (gamestate ^. gamestateShips)
+
+getPlanetById :: Gamestate -> Int -> Maybe Planet
+getPlanetById gamestate id' = listToMaybe $ filter (\p -> p ^. planetId == id') (gamestate ^. gamestatePlanets)
 
 getPlanetByName :: Gamestate -> String -> Maybe Planet
-getPlanetByName gamestate name =
-    case filter (\p -> p ^. planetName == name) (gamestate ^. gamestatePlanets) of
-        []    -> Nothing
-        (p:_) -> Just p -- can really only be one
+getPlanetByName gamestate name = listToMaybe $ filter (\p -> p ^. planetName == name) (gamestate ^. gamestatePlanets)
 
 getPlanetAtShip :: Gamestate -> Ship -> Maybe Planet
 getPlanetAtShip gamestate ship =
-    case planetsAtPosition of
-        []    -> Nothing
-        (p:_) -> Just p -- can really only be one
-    where
-        planetsAtPosition :: [Planet]
-        planetsAtPosition =
-            filter (\p -> p ^. planetPosition ^. positionX == ship ^. shipPosition ^. positionX && p ^. planetPosition ^. positionY == ship ^. shipPosition ^. positionY)
-                   (gamestate ^. gamestatePlanets)
+    listToMaybe $
+        filter (\p -> p ^. planetPosition ^. positionX == ship ^. shipPosition ^. positionX
+                   && p ^. planetPosition ^. positionY == ship ^. shipPosition ^. positionY)
+               (gamestate ^. gamestatePlanets)
 
 myPlanets :: Gamestate -> [Planet]
 myPlanets gamestate =

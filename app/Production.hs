@@ -64,15 +64,20 @@ colonistMaximumPopulation race temperature
     | temperature < 15  = floor $ ((299.9 :: Double) + (200 * fromIntegral temperature)) / 10
     | otherwise         = round $ sin (3.14 * (100 - fromIntegral temperature) / 100 :: Double) * 100000
 
-maximumMines :: Int -> Int
-maximumMines colonistClans
+maximumMinesForColonists :: Int -> Int
+maximumMinesForColonists colonistClans
     | colonistClans <= 200   = colonistClans
     | otherwise              = 200 + (floor $ sqrt (fromIntegral colonistClans - 200 :: Double))
 
-maximumFactories :: Int -> Int
-maximumFactories colonistClans
+maximumFactoriesForColonists :: Int -> Int
+maximumFactoriesForColonists colonistClans
     | colonistClans <= 100   = colonistClans
     | otherwise              = 100 + (floor $ sqrt (fromIntegral colonistClans - 100 :: Double))
+
+maximumDefensesForColonists :: Int -> Int
+maximumDefensesForColonists colonistClans
+    | colonistClans <= 50    = colonistClans
+    | otherwise              = 50 + (floor $ sqrt (fromIntegral colonistClans - 50 :: Double))
 
 -- Planets ordered by closeness to homeworld
 productionReport :: Gamestate -> IO ()
@@ -106,15 +111,15 @@ productionReport gamestate = do
                 ++ " ["
                 ++ printf "%3d" (planet' ^. planetMines)
                 ++ "/"
-                ++ printf "%3d" (maximumMines currentColonistPopulation)
+                ++ printf "%3d" (maximumMinesForColonists currentColonistPopulation)
                 ++ "(↑"
-                ++ printf "%3d" (maximumMines maxColonistPopulation)
+                ++ printf "%3d" (maximumMinesForColonists maxColonistPopulation)
                 ++ ") mines, "
                 ++ printf "%3d" (planet' ^. planetFactories)
                 ++ "/"
-                ++ printf "%3d" (maximumFactories currentColonistPopulation)
+                ++ printf "%3d" (maximumFactoriesForColonists currentColonistPopulation)
                 ++ " ("
-                ++ printf "%3d" (maximumFactories maxColonistPopulation)
+                ++ printf "%3d" (maximumFactoriesForColonists maxColonistPopulation)
                 ++ "↑) factories"
                 ++ "] - "
                 ++ printf "%3.1f" (distance basePlanet planet')
@@ -173,7 +178,7 @@ productionReport gamestate = do
             where
                 productionNextTurn lens' = min (ground ^. lens') (mines * (density ^. lens') `div` 100)
                 _productionNextTurns turns lens' = min (ground ^. lens') (productionNextTurn lens' * turns)
-                productionMaximum numclans lens' = min (ground ^. lens') (maximumMines numclans * (density ^. lens') `div` 100)
+                productionMaximum numclans lens' = min (ground ^. lens') (maximumMinesForColonists numclans * (density ^. lens') `div` 100)
 
                 item :: String -> Lens' Minerals Int -> String
                 item mnemonic lens' =

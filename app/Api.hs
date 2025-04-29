@@ -272,20 +272,26 @@ defaultShipUpdate _id = ShipUpdate _id Nothing Nothing Nothing Nothing Nothing N
 
 data PlanetUpdate
     = PlanetUpdate
-        { _planetUpdatePlanetId    :: Int
-        , _planetUpdateClans       :: Maybe Int
-        , _planetUpdateMegaCredits :: Maybe Int
-        , _planetUpdateSupplies    :: Maybe Int
-        , _planetUpdateNeutronium  :: Maybe Int
-        , _planetUpdateDuranium    :: Maybe Int
-        , _planetUpdateTritanium   :: Maybe Int
-        , _planetUpdateMolybdenum  :: Maybe Int
+        { _planetUpdatePlanetId       :: Int
+        , _planetUpdateClans          :: Maybe Int
+        , _planetUpdateMegaCredits    :: Maybe Int
+        , _planetUpdateSupplies       :: Maybe Int
+        , _planetUpdateNeutronium     :: Maybe Int
+        , _planetUpdateDuranium       :: Maybe Int
+        , _planetUpdateTritanium      :: Maybe Int
+        , _planetUpdateMolybdenum     :: Maybe Int
+        , _planetUpdateMines          :: Maybe Int
+        , _planetUpdateFactories      :: Maybe Int
+        , _planetUpdateDefense        :: Maybe Int
+        , _planetUpdateBuiltMines     :: Maybe Int
+        , _planetUpdateBuiltFactories :: Maybe Int
+        , _planetUpdateBuiltDefense   :: Maybe Int
         }
 
 makeLenses ''PlanetUpdate
 
 defaultPlanetUpdate :: Int -> PlanetUpdate
-defaultPlanetUpdate _id = PlanetUpdate _id Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+defaultPlanetUpdate _id = PlanetUpdate _id Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 data TransferTargetType = PlanetTransferTarget
 
@@ -317,7 +323,7 @@ instance Show ShipUpdate where
         <> build "Mission" (Just 0 :: Maybe Int)
 
 instance Show PlanetUpdate where
-    show (PlanetUpdate id' clans mc sup neu tri dur mol) =
+    show (PlanetUpdate id' clans mc sup neu tri dur mol mines factories defense builtmines builtfactories builtdefense) =
         "Planet" <> show id' <> "=Id:::" <> show id'
         <> build "Clans" clans
         <> build "MegaCredits" mc
@@ -326,6 +332,12 @@ instance Show PlanetUpdate where
         <> build "Duranium" dur
         <> build "Tritanium" tri
         <> build "Molybdenum" mol
+        <> build "Mines" mines
+        <> build "Factories" factories
+        <> build "Defense" defense
+        <> build "BuiltMines" builtmines
+        <> build "BuiltFactories" builtfactories
+        <> build "BuiltDefense" builtdefense
 
 build :: Show a => String -> Maybe a -> String
 build _ Nothing    = ""

@@ -2,31 +2,39 @@
 
 module Main where
 
-import           Api                             (currentTurn, login, update)
-import           Calcs                           (production)
-import           Control.Monad                   (foldM, void)
-import           Data.Data                       (Data)
-import           Data.Map                        (empty)
-import           Data.Maybe                      (fromMaybe)
-import           Model                           (cargoUsed, getShipById,
-                                                  hullCargo, myPlanets, myShips,
-                                                  planetName, planetNativeType,
-                                                  planetResources,
-                                                  resourcesClans, shipAmmo,
-                                                  shipHull, shipId, shipName,
-                                                  shipResources, totalResources)
-import qualified Model                           as Model (fromLoadTurnResponse)
-import           MyScripts                       (GameDef (GameDef), scripts)
-import           Optics.Operators                ((^.))
-import           Production                      (productionReport)
-import           Scripting.ShipScript            (ShipScriptEnvironment (ShipScriptEnvironment),
-                                                  ShipScriptState (..))
-import           Scripting.ShipScriptInterpreter (restoreAndRun)
-import           System.Console.CmdArgs          (cmdArgsMode, cmdArgsRun, help,
-                                                  modes, name, program, summary,
-                                                  typ, (&=))
-import           System.IO.Error                 (tryIOError)
-import           Text.Printf                     (printf)
+import           Api                               (currentTurn, login, update)
+import           Calcs                             (production)
+import           Control.Monad                     (foldM, void)
+import           Data.Data                         (Data)
+import           Data.Map                          (empty)
+import           Data.Maybe                        (fromMaybe)
+import           Model                             (cargoUsed, getPlanetById,
+                                                    getShipById, hullCargo,
+                                                    myPlanets, myShips,
+                                                    planetName,
+                                                    planetNativeType,
+                                                    planetResources,
+                                                    resourcesClans, shipAmmo,
+                                                    shipHull, shipId, shipName,
+                                                    shipResources,
+                                                    totalResources)
+import qualified Model                             as Model (fromLoadTurnResponse)
+import           MyScripts                         (GameDef (GameDef), scripts)
+import           Optics.Operators                  ((^.))
+import           Production                        (productionReport)
+import           Scripting.PlanetScript            (PlanetScriptEnvironment (..),
+                                                    PlanetScriptState (..))
+import qualified Scripting.PlanetScriptInterpreter as PlanetScriptInterpreter (restoreAndRun,
+                                                                               showPlanetScriptLog)
+import           Scripting.ShipScript              (ShipScriptEnvironment (ShipScriptEnvironment),
+                                                    ShipScriptState (..))
+import qualified Scripting.ShipScriptInterpreter   as ShipScriptInterpreter (restoreAndRun,
+                                                                             showShipScriptLog)
+import           System.Console.CmdArgs            (cmdArgsMode, cmdArgsRun,
+                                                    help, modes, name, program,
+                                                    summary, typ, (&=))
+import           System.IO.Error                   (tryIOError)
+import           Text.Printf                       (printf)
 
 -- Read from file, first line is username, second line is password
 readCredential :: IO (String, String)
@@ -140,25 +148,34 @@ main = do
             productionReport gamestate
         RunScript -> do
             mapM_
-                (\(GameDef gameid shipScripts _planetScripts) -> do
-                    putStrLn $ "Running script for game " <> show gameid
+                (\(GameDef gameid shipScripts planetScripts) -> do
+                    putStrLn $ "Running scripts for game " <> show gameid
 
                     loadturn <- currentTurn apikey (show gameid)
                     let gamestate = Model.fromLoadTurnResponse loadturn
 
-                    shipScriptStates <- foldM (\state (shipId', shipScript) -> do
-                                let ship = fromMaybe (error $ "Can't find ship! " <> (show shipId'))
+                    -- Run the ship scripts
+                    (ShipScriptState shipUpdates planetUpdates)
+                        <- foldM (\state (shipId', shipScript) -> do
+                                let ship = fromMaybe (error $ "Can't find ship! " <> show shipId')
                                                      (getShipById gamestate shipId')
                                 let environment = ShipScriptEnvironment ship gamestate
-                                let (log', updates) = restoreAndRun environment state shipScript
-                                putStrLn $ "Log: " <> show log'
+                                let (log', updates) = ShipScriptInterpreter.restoreAndRun environment state shipScript
+                                putStrLn $ ShipScriptInterpreter.showShipScriptLog ship log'
                                 pure updates
-
                             ) (ShipScriptState empty empty) shipScripts
 
-                    let (ShipScriptState shipUpdates planetUpdates) = shipScriptStates
+                    -- Run the planet scripts, passing in the same state
+                    (PlanetScriptState shipUpdates' planetUpdates') <- foldM (\state (planetId', planetScript) -> do
+                                let planet = fromMaybe  (error $ "Can't find planet! " <> show planetId')
+                                                        (getPlanetById gamestate planetId')
+                                let environment = PlanetScriptEnvironment planet gamestate
+                                let (log', updates) = PlanetScriptInterpreter.restoreAndRun environment state planetScript
+                                putStrLn $ PlanetScriptInterpreter.showPlanetScriptLog planet log'
+                                pure updates
+                            ) (PlanetScriptState shipUpdates planetUpdates) planetScripts
 
-                    update apikey loadturn shipUpdates planetUpdates
+                    update apikey loadturn shipUpdates' planetUpdates'
                     putStrLn "end"
 
                     pure ()

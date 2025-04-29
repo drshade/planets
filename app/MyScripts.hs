@@ -1,12 +1,10 @@
 module MyScripts where
 import           CommonScripts
 import           Model
+import           Scripting.PlanetScript (PlanetScript)
 import           Scripting.ShipScript
 
--- To move to PlanetsScripting one day
-type PlanetScript = ()
-
-(==>) :: ShipId -> ShipScript -> ShipScriptAssignment
+(==>) :: id -> s -> (id, s)
 (==>) id' script' = (id', script')
 
 type ShipScriptAssignment = (ShipId, ShipScript)
@@ -45,7 +43,9 @@ scripts =
 
     game 644461
         ^-> (1 ==> coloniseScript homeplanet)
-        ^-> (3 ==> collectAndDropScript "Kapteyn's Planet" homeplanet)
-        ^-> (4 ==> collectAndDropScript "Serada 9" homeplanet)
+        -- ^-> (3 ==> collectAndDropScript "Kapteyn's Planet" homeplanet)
+        -- ^-> (4 ==> collectAndDropScript "Serada 9" homeplanet)
+        @-> (5 ==> buildOneOfEachScript)
+        -- @-> (2 ==> buildMaxMinesScript)
 
     :[]

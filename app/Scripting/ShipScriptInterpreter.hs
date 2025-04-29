@@ -39,7 +39,8 @@ import           Model                (Amount (..), Planet, Resource (..),
                                        positionX, positionY, resourcesClans,
                                        resourcesMegaCredits, resourcesMinerals,
                                        resourcesSupplies, shipEngine, shipHull,
-                                       shipId, shipOwnerId, shipResources)
+                                       shipId, shipName, shipOwnerId,
+                                       shipResources)
 import           Optics               (_Just, (%), (.~), (^.), (^?))
 import           Optics.Lens          (Lens')
 import           Scripting.ShipScript (ShipScript, ShipScriptEnvironment (..),
@@ -47,9 +48,9 @@ import           Scripting.ShipScript (ShipScript, ShipScriptEnvironment (..),
                                        ShipScriptInstruction, ShipScriptLog,
                                        ShipScriptRWS, ShipScriptState (..))
 
-interpretRWS :: ShipScriptInstruction a -> ShipScriptRWS ()
-interpretRWS (Pure _) = pure ()
-interpretRWS (Free (FlyTo planet _next)) = do
+interpret :: ShipScriptInstruction a -> ShipScriptRWS ()
+interpret (Pure _) = pure ()
+interpret (Free (FlyTo planet _next)) = do
     tell ["FlyTo " <> planet]
     ShipScriptEnvironment ship gamestate <- ask
     case getPlanetByName gamestate planet of
@@ -74,29 +75,29 @@ interpretRWS (Free (FlyTo planet _next)) = do
                       )
         Nothing -> pure ()
         -- Do not continue the script
-interpretRWS (Free (Pickup amt resource next)) = do
+interpret (Free (Pickup amt resource next)) = do
     tell ["Pickup " <> show amt <> " " <> show resource]
     ShipScriptEnvironment ship gamestate <- ask
     case getPlanetAtShip gamestate ship of
         Just planet -> transferTo ship planet resource amt
         Nothing     -> pure ()
-    interpretRWS next
-interpretRWS (Free (DropOff amt resource next)) = do
+    interpret next
+interpret (Free (DropOff amt resource next)) = do
     tell ["DropOff " <> show amt <> " " <> show resource]
     ShipScriptEnvironment ship gamestate <- ask
     case getPlanetAtShip gamestate ship of
         Just planet -> transferToPlanet ship planet resource amt
         Nothing     -> pure ()
-    interpretRWS next
-interpretRWS (Free (GetShip next)) = do
+    interpret next
+interpret (Free (GetShip next)) = do
     tell ["GetShip"]
     ShipScriptEnvironment ship _gamestate <- ask
-    interpretRWS $ next ship
-interpretRWS (Free (GetPlanets next)) = do
+    interpret $ next ship
+interpret (Free (GetPlanets next)) = do
     tell ["GetPlanets"]
     ShipScriptEnvironment _ship gamestate <- ask
     let planets = gamestate ^. gamestatePlanets
-    interpretRWS $ next planets
+    interpret $ next planets
 
 shipCurrentCargo :: Ship -> Int
 shipCurrentCargo ship =
@@ -205,7 +206,7 @@ restore environment@(ShipScriptEnvironment ship gamestate) instr =
             case instr of
                 (Pure ())                                       -> pure ()
                 (Free (FlyTo planet next)) | planet == location -> next -- found our restore point :)
-                                        | otherwise             -> restore environment next
+                                           | otherwise          -> restore environment next
                 (Free (Pickup _amt _resource next))             -> restore environment next
                 (Free (DropOff _amt _resource next))            -> restore environment next
                 (Free (GetShip next))                           -> restore environment (next ship)
@@ -214,8 +215,15 @@ restore environment@(ShipScriptEnvironment ship gamestate) instr =
 restoreAndRun :: ShipScriptEnvironment -> ShipScriptState -> ShipScript -> (ShipScriptLog, ShipScriptState)
 restoreAndRun environment state script = do
     let restored = restore environment script
-    let shipScriptRWS = interpretRWS restored
-    -- let shipScriptState = ShipScriptState Map.empty Map.empty
+    let shipScriptRWS = interpret restored
     let ((), state', updates) = runRWS shipScriptRWS environment state
     (updates, state')
 
+showShipScriptLog :: Ship -> ShipScriptLog -> String
+showShipScriptLog ship logs =
+    "Script ship for "
+        <> ship ^. shipName
+        <> " (id "
+        <> show (ship ^. shipId)
+        <> "):\n"
+        <> (unlines $ (\l -> " -> " <> l) <$> logs)

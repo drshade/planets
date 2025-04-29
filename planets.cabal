@@ -69,6 +69,8 @@ executable planets
                     , MyScripts
                     , Scripting.ShipScript
                     , Scripting.ShipScriptInterpreter
+                    , Scripting.PlanetScript
+                    , Scripting.PlanetScriptInterpreter
                     , Production
 
     -- LANGUAGE extensions used by modules in this package.
