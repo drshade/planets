@@ -75,7 +75,7 @@ executable planets
     -- other-extensions: TemplateHaskell, DeriveGeneric
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.20.0.0
+    build-depends:    base
                     , bytestring
                     , containers, mtl, free
                     , http-client, http-client-tls, http-types
