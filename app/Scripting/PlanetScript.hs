@@ -1,16 +1,6 @@
 module Scripting.PlanetScript where
-import           Api                (PlanetUpdate, ShipUpdate)
 import           Control.Monad.Free (Free, liftF)
-import           Control.Monad.RWS  (RWS)
-import           Data.Map           (Map)
-import           Model              (Amount, Gamestate, Planet, PlanetId,
-                                     Resource, ShipId)
-
-data PlanetScriptEnvironment = PlanetScriptEnvironment Planet Gamestate
-type PlanetScriptLog = [String]
-data PlanetScriptState = PlanetScriptState (Map ShipId ShipUpdate) (Map PlanetId PlanetUpdate)
-
-type PlanetScriptRWS = RWS PlanetScriptEnvironment PlanetScriptLog PlanetScriptState
+import           Model              (Amount, Planet, Resource)
 
 data PlanetScriptInstr next
     = GetPlanet (Planet -> next)

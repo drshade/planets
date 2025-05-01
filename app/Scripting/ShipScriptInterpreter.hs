@@ -1,7 +1,6 @@
 module Scripting.ShipScriptInterpreter where
 import           Api                  (PlanetUpdate (..), ShipUpdate (..),
                                        TransferTargetType (..),
-                                       defaultPlanetUpdate, defaultShipUpdate,
                                        planetUpdateClans, planetUpdateDuranium,
                                        planetUpdateMegaCredits,
                                        planetUpdateMolybdenum,
@@ -26,7 +25,7 @@ import           Control.Monad.Free   (Free (..))
 import           Control.Monad.RWS    (MonadState (get, put), ask, modify,
                                        runRWS, tell)
 import           Data.Function        ((&))
-import qualified Data.Map             as Map (alter, insert, lookup)
+import qualified Data.Map             as Map (insert)
 import           Data.Maybe           (fromMaybe)
 import           Model                (Amount (..), Planet, Resource (..),
                                        Resources, Ship, engineId,
@@ -43,59 +42,55 @@ import           Model                (Amount (..), Planet, Resource (..),
                                        shipResources)
 import           Optics               (_Just, (%), (.~), (^.), (^?))
 import           Optics.Lens          (Lens')
-import           Scripting.ShipScript (ShipScript, ShipScriptEnvironment (..),
-                                       ShipScriptInstr (..),
-                                       ShipScriptInstruction, ShipScriptLog,
-                                       ShipScriptRWS, ShipScriptState (..))
+import           Scripting.ShipScript (ShipScript, ShipScriptInstr (..),
+                                       ShipScriptInstruction)
+import           Scripting.Types      (ScriptEnvironment (..), ScriptLog,
+                                       ScriptRWS, ScriptState (..))
+import           Scripting.Updates    (getPlanetUpdate, getShipUpdate)
 
-interpret :: ShipScriptInstruction a -> ShipScriptRWS ()
+interpret :: ShipScriptInstruction a -> ScriptRWS Ship ()
 interpret (Pure _) = pure ()
 interpret (Free (FlyTo planet _next)) = do
     tell ["FlyTo " <> planet]
-    ShipScriptEnvironment ship gamestate <- ask
+    ScriptEnvironment gamestate ship <- ask
+    shipUpdate <- getShipUpdate ship
     case getPlanetByName gamestate planet of
         Just planet' ->
-            modify $ (\(ShipScriptState shipUpdates planetUpdates) ->
-                        ShipScriptState
-                            (Map.alter (\old ->
-                                        let shipUpdate = case old of
-                                                Just old' -> old'
-                                                Nothing   -> defaultShipUpdate (ship ^. shipId)
-                                         in Just $ shipUpdate
-                                                    { _shipUpdateX = Just $ planet' ^. planetPosition ^. positionX
-                                                    , _shipUpdateY = Just $ planet' ^. planetPosition ^. positionY
-                                                    -- Set the warp speed to the engines id (1 - 9)
-                                                    , _shipUpdateWarp = ship ^? shipEngine % _Just % engineId
-                                                    }
-                                   )
-                                (ship ^. shipId)
-                                shipUpdates
-                            )
+            modify $ (\(ScriptState shipUpdates planetUpdates) ->
+                        ScriptState
+                            (Map.insert (ship ^. shipId) (
+                                shipUpdate -- TBD use lenses to update
+                                    { _shipUpdateTargetX = planet' ^. planetPosition ^. positionX
+                                    , _shipUpdateTargetY = planet' ^. planetPosition ^. positionY
+                                    -- Set the warp speed to the engines id (1 - 9)
+                                    , _shipUpdateWarp = fromMaybe (error "no engine on friendly ship??") $ ship ^? shipEngine % _Just % engineId
+                                    }
+                                ) shipUpdates)
                             planetUpdates
                       )
         Nothing -> pure ()
         -- Do not continue the script
 interpret (Free (Pickup amt resource next)) = do
     tell ["Pickup " <> show amt <> " " <> show resource]
-    ShipScriptEnvironment ship gamestate <- ask
+    ScriptEnvironment gamestate ship <- ask
     case getPlanetAtShip gamestate ship of
         Just planet -> transferTo ship planet resource amt
         Nothing     -> pure ()
     interpret next
 interpret (Free (DropOff amt resource next)) = do
     tell ["DropOff " <> show amt <> " " <> show resource]
-    ShipScriptEnvironment ship gamestate <- ask
+    ScriptEnvironment gamestate ship <- ask
     case getPlanetAtShip gamestate ship of
         Just planet -> transferToPlanet ship planet resource amt
         Nothing     -> pure ()
     interpret next
 interpret (Free (GetShip next)) = do
     tell ["GetShip"]
-    ShipScriptEnvironment ship _gamestate <- ask
+    ScriptEnvironment _gamestate ship <- ask
     interpret $ next ship
 interpret (Free (GetPlanets next)) = do
     tell ["GetPlanets"]
-    ShipScriptEnvironment _ship gamestate <- ask
+    ScriptEnvironment gamestate _ship <- ask
     let planets = gamestate ^. gamestatePlanets
     interpret $ next planets
 
@@ -111,13 +106,13 @@ shipCurrentFuel :: Ship -> Int
 shipCurrentFuel ship =
     ship ^. shipResources ^. resourcesMinerals ^. mineralsNeutronium
 
-transferTo :: MonadState ShipScriptState m => Ship -> Planet -> Resource -> Amount -> m ()
+transferTo :: Ship -> Planet -> Resource -> Amount -> ScriptRWS Ship ()
 transferTo ship planet resource amount = do
-    (ShipScriptState shipUpdates planetUpdates) <- get
+    (ScriptState shipUpdates planetUpdates) <- get
 
     -- Do we already have a state update for this ship and/or planet?
-    let shipUpdate = fromMaybe (defaultShipUpdate (ship ^. shipId)) $ Map.lookup (ship ^. shipId) shipUpdates
-    let planetUpdate = fromMaybe (defaultPlanetUpdate (planet ^. planetId)) $ Map.lookup (planet ^. planetId) planetUpdates
+    shipUpdate <- getShipUpdate ship
+    planetUpdate <- getPlanetUpdate planet
 
     let (shipUpdate', planetUpdate') = case resource of
             Clans       -> applyUpdate shipUpdate planetUpdate resourcesClans shipUpdateClans planetUpdateClans $ Just (ship ^. shipHull ^. hullCargo - shipCurrentCargo ship) -- limited by cargo
@@ -128,31 +123,31 @@ transferTo ship planet resource amount = do
             Tri         -> applyUpdate shipUpdate planetUpdate (resourcesMinerals % mineralsTritanium) shipUpdateTritanium planetUpdateTritanium $ Just (ship ^. shipHull ^. hullCargo - shipCurrentCargo ship)
             Mol         -> applyUpdate shipUpdate planetUpdate (resourcesMinerals % mineralsMolybdenum) shipUpdateMolybdenum planetUpdateMolybdenum $ Just (ship ^. shipHull ^. hullCargo - shipCurrentCargo ship)
 
-    put $ ShipScriptState (Map.insert (ship ^. shipId) shipUpdate' shipUpdates) (Map.insert (planet ^. planetId) planetUpdate' planetUpdates)
+    put $ ScriptState (Map.insert (ship ^. shipId) shipUpdate' shipUpdates) (Map.insert (planet ^. planetId) planetUpdate' planetUpdates)
 
-        where applyUpdate :: ShipUpdate -> PlanetUpdate -> (Lens' Resources Int) -> (Lens' ShipUpdate (Maybe Int)) -> (Lens' PlanetUpdate (Maybe Int)) -> Maybe Int -> (ShipUpdate, PlanetUpdate)
+        where applyUpdate :: ShipUpdate -> PlanetUpdate -> (Lens' Resources Int) -> (Lens' ShipUpdate Int) -> (Lens' PlanetUpdate Int) -> Maybe Int -> (ShipUpdate, PlanetUpdate)
               applyUpdate shipUpdate planetUpdate resourceLens shipUpdateLens planetUpdateLens clamp =
-                let shipCurrent = ship ^. shipResources ^. resourceLens
+                let _shipCurrent = ship ^. shipResources ^. resourceLens
                     planetCurrent = planet ^.planetResources ^. resourceLens
                     amount' = case amount of Exact a -> a; Max -> planetCurrent
                     amt = case clamp of Nothing -> (min (amount') (planetCurrent)); Just maxAmount' -> min (maxAmount') (min (amount') (planetCurrent))
                  in
-                    ( shipUpdate & shipUpdateLens .~ Just ((fromMaybe shipCurrent (shipUpdate ^. shipUpdateLens)) + amt)
-                    , planetUpdate & planetUpdateLens .~ Just ((fromMaybe planetCurrent (planetUpdate ^. planetUpdateLens)) - amt)
+                    ( shipUpdate & shipUpdateLens .~ shipUpdate ^. shipUpdateLens + amt
+                    , planetUpdate & planetUpdateLens .~ planetUpdate ^. planetUpdateLens - amt
                     )
 
-transferToPlanet :: MonadState ShipScriptState m => Ship -> Planet -> Resource -> Amount -> m ()
+transferToPlanet :: Ship -> Planet -> Resource -> Amount -> ScriptRWS Ship ()
 transferToPlanet ship planet resource amount = do
-    (ShipScriptState shipUpdates planetUpdates) <- get
+    (ScriptState shipUpdates planetUpdates) <- get
 
     -- Do we already have a state update for this ship and/or planet?
-    let shipUpdate = fromMaybe (defaultShipUpdate (ship ^. shipId)) $ Map.lookup (ship ^. shipId) shipUpdates
+    shipUpdate <- getShipUpdate ship
 
     -- Do we own this planet?
     if (ship ^. shipOwnerId == planet ^. planetOwnerId)
         then do
             -- We can update ship & planet together in a fairly normal way
-            let planetUpdate = fromMaybe (defaultPlanetUpdate (planet ^. planetId)) $ Map.lookup (planet ^. planetId) planetUpdates
+            planetUpdate <- getPlanetUpdate planet
             let (shipUpdate', planetUpdate') = case resource of
                     Clans       -> applyUpdateToOwned shipUpdate planetUpdate resourcesClans shipUpdateClans planetUpdateClans
                     Mc          -> applyUpdateToOwned shipUpdate planetUpdate resourcesMegaCredits shipUpdateMegaCredits planetUpdateMegaCredits
@@ -162,7 +157,7 @@ transferToPlanet ship planet resource amount = do
                     Tri         -> applyUpdateToOwned shipUpdate planetUpdate (resourcesMinerals % mineralsTritanium) shipUpdateTritanium planetUpdateTritanium
                     Mol         -> applyUpdateToOwned shipUpdate planetUpdate (resourcesMinerals % mineralsMolybdenum) shipUpdateMolybdenum planetUpdateMolybdenum
 
-            put $ ShipScriptState (Map.insert (ship ^. shipId) shipUpdate' shipUpdates) (Map.insert (planet ^. planetId) planetUpdate' planetUpdates)
+            put $ ScriptState (Map.insert (ship ^. shipId) shipUpdate' shipUpdates) (Map.insert (planet ^. planetId) planetUpdate' planetUpdates)
 
         else do
             -- We cannot update the planet, but rather set the "Transfer" fields
@@ -175,30 +170,30 @@ transferToPlanet ship planet resource amount = do
                     Tri         -> applyUpdateToNonOwned shipUpdate (resourcesMinerals % mineralsTritanium) shipUpdateTritanium shipUpdateTransferTritanium
                     Mol         -> applyUpdateToNonOwned shipUpdate (resourcesMinerals % mineralsMolybdenum) shipUpdateMolybdenum shipUpdateTransferMolybdenum
 
-            put $ ShipScriptState (Map.insert (ship ^. shipId) shipUpdate' shipUpdates) planetUpdates
+            put $ ScriptState (Map.insert (ship ^. shipId) shipUpdate' shipUpdates) planetUpdates
 
-        where applyUpdateToOwned :: ShipUpdate -> PlanetUpdate -> (Lens' Resources Int) -> (Lens' ShipUpdate (Maybe Int)) -> (Lens' PlanetUpdate (Maybe Int)) -> (ShipUpdate, PlanetUpdate)
+        where applyUpdateToOwned :: ShipUpdate -> PlanetUpdate -> (Lens' Resources Int) -> (Lens' ShipUpdate Int) -> (Lens' PlanetUpdate Int) -> (ShipUpdate, PlanetUpdate)
               applyUpdateToOwned shipUpdate planetUpdate resourceLens shipUpdateLens planetUpdateLens  =
                 let shipCurrent = ship ^. shipResources ^. resourceLens
-                    planetCurrent = planet ^. planetResources ^. resourceLens
+                    _planetCurrent = planet ^. planetResources ^. resourceLens
                     amount' = case amount of Exact a -> min a shipCurrent; Max -> shipCurrent
                  in
-                    ( shipUpdate & shipUpdateLens .~ Just ((fromMaybe shipCurrent (shipUpdate ^. shipUpdateLens)) - amount')
-                    , planetUpdate & planetUpdateLens .~ Just ((fromMaybe planetCurrent (planetUpdate ^. planetUpdateLens)) + amount')
+                    ( shipUpdate & shipUpdateLens .~ shipUpdate ^. shipUpdateLens - amount'
+                    , planetUpdate & planetUpdateLens .~ planetUpdate ^. planetUpdateLens + amount'
 
                     )
-              applyUpdateToNonOwned :: ShipUpdate -> (Lens' Resources Int) -> (Lens' ShipUpdate (Maybe Int)) -> (Lens' ShipUpdate (Maybe Int)) -> ShipUpdate
+              applyUpdateToNonOwned :: ShipUpdate -> (Lens' Resources Int) -> (Lens' ShipUpdate Int) -> (Lens' ShipUpdate Int) -> ShipUpdate
               applyUpdateToNonOwned shipUpdate resourceLens shipUpdateLens shipUpdateTransferLens  =
                 let shipCurrent = ship ^. shipResources ^. resourceLens
                     amount' = case amount of Exact a -> min a shipCurrent; Max -> shipCurrent
                  in
-                    shipUpdate & shipUpdateLens .~ Just ((fromMaybe shipCurrent (shipUpdate ^. shipUpdateLens)) - amount')
-                               & shipUpdateTransferLens .~ Just amount'
-                               & shipUpdateTransferTargetId .~ Just (planet ^. planetId)
-                               & shipUpdateTransferTargetType .~ Just (transferTargetType PlanetTransferTarget)
+                    shipUpdate & shipUpdateLens .~ shipUpdate ^. shipUpdateLens - amount'
+                               & shipUpdateTransferLens .~ amount'
+                               & shipUpdateTransferTargetId .~ planet ^. planetId
+                               & shipUpdateTransferTargetType .~ transferTargetType PlanetTransferTarget
 
-restore :: ShipScriptEnvironment -> ShipScriptInstruction () -> ShipScriptInstruction ()
-restore environment@(ShipScriptEnvironment ship gamestate) instr =
+restore :: ScriptEnvironment Ship -> ShipScriptInstruction () -> ShipScriptInstruction ()
+restore environment@(ScriptEnvironment gamestate ship) instr =
     -- Only restores if the ship is at a particular planet that is referenced in the script (for now!)
     case (\p -> p ^. planetName) <$> getPlanetAtShip gamestate ship of
         Nothing -> pure ()
@@ -212,14 +207,14 @@ restore environment@(ShipScriptEnvironment ship gamestate) instr =
                 (Free (GetShip next))                           -> restore environment (next ship)
                 (Free (GetPlanets next))                        -> restore environment (next (gamestate ^. gamestatePlanets))
 
-restoreAndRun :: ShipScriptEnvironment -> ShipScriptState -> ShipScript -> (ShipScriptLog, ShipScriptState)
+restoreAndRun :: ScriptEnvironment Ship -> ScriptState -> ShipScript -> (ScriptLog, ScriptState)
 restoreAndRun environment state script = do
     let restored = restore environment script
     let shipScriptRWS = interpret restored
     let ((), state', updates) = runRWS shipScriptRWS environment state
     (updates, state')
 
-showShipScriptLog :: Ship -> ShipScriptLog -> String
+showShipScriptLog :: Ship -> ScriptLog -> String
 showShipScriptLog ship logs =
     "Script ship for "
         <> ship ^. shipName

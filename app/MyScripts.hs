@@ -38,14 +38,15 @@ scripts =
     -- game 643598
 
     -- Basic training game
-    let homeplanet = "Hiperborealia"
+    let _homeplanet = "Hiperborealia"
      in
 
     game 644461
-        ^-> (1 ==> coloniseScript homeplanet)
+        ^-> (1 ==> patrolScript ["Hiperborealia", "Phorax", "Rsky Business"])
+        -- ^-> (1 ==> coloniseScript homeplanet)
         -- ^-> (3 ==> collectAndDropScript "Kapteyn's Planet" homeplanet)
         -- ^-> (4 ==> collectAndDropScript "Serada 9" homeplanet)
-        @-> (5 ==> buildOneOfEachScript)
+        -- @-> (5 ==> buildOneOfEachScript)
         -- @-> (2 ==> buildMaxMinesScript)
 
     :[]

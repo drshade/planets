@@ -67,6 +67,8 @@ executable planets
                     , Calcs
                     , CommonScripts
                     , MyScripts
+                    , Scripting.Types
+                    , Scripting.Updates
                     , Scripting.ShipScript
                     , Scripting.ShipScriptInterpreter
                     , Scripting.PlanetScript
