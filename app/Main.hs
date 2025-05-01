@@ -35,17 +35,22 @@ import           System.Console.CmdArgs            (cmdArgsMode, cmdArgsRun,
                                                     summary, typ, (&=))
 import           System.IO.Error                   (tryIOError)
 import           Text.Printf                       (printf)
+import           System.Directory (getCurrentDirectory)
 
 -- Read from file, first line is username, second line is password
 readCredential :: IO (String, String)
 readCredential = do
     credentials <- tryIOError $ readFile ".credential"
     case credentials of
-        Left _ -> error message
-        Right contents -> case lines contents of
-            username : password : _ -> pure (username, password)
-            _                       -> error message
-    where message = "Expected 2 lines in a file named '.credential'. First line username, second line password."
+        Left _ -> do
+            cwd <- getCurrentDirectory
+            error $ "File '.credential' not found in the current working directory: " ++ cwd
+        Right contents -> do
+            putStrLn "File contents:"
+            putStrLn contents
+            case lines contents of
+                username : password : _ -> pure (username, password)
+                _ -> error "Expected 2 lines in a file named '.credential'. First line username, second line password."
 
 printSummaryReport :: String -> IO ()
 printSummaryReport gameid = do
