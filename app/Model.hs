@@ -91,7 +91,7 @@ data Ship = Ship
     , _shipResources      :: Resources
     , _shipAmmo           :: Int
     , _shipHull           :: Hull
-    , _shipEngine         :: Maybe Engine
+    , _shipEngine         :: Maybe Engine -- may not have an engine if we are an enemy ship (ie not known)
     } deriving (Show)
 
 data Hull = Hull

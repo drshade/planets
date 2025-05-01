@@ -75,6 +75,9 @@ coloniseWithRatiosScript homeplanet = do
 
     pure ()
 
+patrolScript :: [PlanetName] -> ShipScript
+patrolScript = mapM_ flyTo . cycle
+
 buildMaxMinesScript :: PlanetScript
 buildMaxMinesScript = buildMines Max
 

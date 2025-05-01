@@ -22,14 +22,13 @@ import qualified Model                             as Model (fromLoadTurnRespons
 import           MyScripts                         (GameDef (GameDef), scripts)
 import           Optics.Operators                  ((^.))
 import           Production                        (productionReport)
-import           Scripting.PlanetScript            (PlanetScriptEnvironment (..),
-                                                    PlanetScriptState (..))
 import qualified Scripting.PlanetScriptInterpreter as PlanetScriptInterpreter (restoreAndRun,
                                                                                showPlanetScriptLog)
-import           Scripting.ShipScript              (ShipScriptEnvironment (ShipScriptEnvironment),
-                                                    ShipScriptState (..))
+
 import qualified Scripting.ShipScriptInterpreter   as ShipScriptInterpreter (restoreAndRun,
                                                                              showShipScriptLog)
+import           Scripting.Types                   (ScriptEnvironment (..),
+                                                    ScriptState (ScriptState))
 import           System.Console.CmdArgs            (cmdArgsMode, cmdArgsRun,
                                                     help, modes, name, program,
                                                     summary, typ, (&=))
@@ -155,25 +154,25 @@ main = do
                     let gamestate = Model.fromLoadTurnResponse loadturn
 
                     -- Run the ship scripts
-                    (ShipScriptState shipUpdates planetUpdates)
+                    (ScriptState shipUpdates planetUpdates)
                         <- foldM (\state (shipId', shipScript) -> do
                                 let ship = fromMaybe (error $ "Can't find ship! " <> show shipId')
                                                      (getShipById gamestate shipId')
-                                let environment = ShipScriptEnvironment ship gamestate
+                                let environment = ScriptEnvironment gamestate ship
                                 let (log', updates) = ShipScriptInterpreter.restoreAndRun environment state shipScript
                                 putStrLn $ ShipScriptInterpreter.showShipScriptLog ship log'
                                 pure updates
-                            ) (ShipScriptState empty empty) shipScripts
+                            ) (ScriptState empty empty) shipScripts
 
                     -- Run the planet scripts, passing in the same state
-                    (PlanetScriptState shipUpdates' planetUpdates') <- foldM (\state (planetId', planetScript) -> do
+                    (ScriptState shipUpdates' planetUpdates') <- foldM (\state (planetId', planetScript) -> do
                                 let planet = fromMaybe  (error $ "Can't find planet! " <> show planetId')
                                                         (getPlanetById gamestate planetId')
-                                let environment = PlanetScriptEnvironment planet gamestate
+                                let environment = ScriptEnvironment gamestate planet
                                 let (log', updates) = PlanetScriptInterpreter.restoreAndRun environment state planetScript
                                 putStrLn $ PlanetScriptInterpreter.showPlanetScriptLog planet log'
                                 pure updates
-                            ) (PlanetScriptState shipUpdates planetUpdates) planetScripts
+                            ) (ScriptState shipUpdates planetUpdates) planetScripts
 
                     update apikey loadturn shipUpdates' planetUpdates'
                     putStrLn "end"

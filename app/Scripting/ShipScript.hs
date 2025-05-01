@@ -1,15 +1,6 @@
 module Scripting.ShipScript where
-import           Api                (PlanetUpdate, ShipUpdate)
 import           Control.Monad.Free (Free, liftF)
-import           Control.Monad.RWS  (RWS)
-import           Data.Map           (Map)
 import           Model
-
-data ShipScriptEnvironment = ShipScriptEnvironment Ship Gamestate
-type ShipScriptLog = [String]
-data ShipScriptState = ShipScriptState (Map ShipId ShipUpdate) (Map PlanetId PlanetUpdate)
-
-type ShipScriptRWS = RWS ShipScriptEnvironment ShipScriptLog ShipScriptState
 
 data ShipScriptInstr next
     = FlyTo String next
