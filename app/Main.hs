@@ -44,11 +44,8 @@ readCredential = do
     case credentials of
         Left _ -> do
             cwd <- getCurrentDirectory
-            error $ "File '.credential' not found in the current working directory: " ++ cwd
-        Right contents -> do
-            putStrLn "File contents:"
-            putStrLn contents
-            case lines contents of
+            error $ "Attempting to read .credential file from  working directory: " ++ cwd
+        Right contents -> case lines contents of
                 username : password : _ -> pure (username, password)
                 _ -> error "Expected 2 lines in a file named '.credential'. First line username, second line password."
 
