@@ -148,12 +148,12 @@ password
 
 For resource reporting:
 ```sh
-cabal run planets -- report -g GAME_ID
+cabal run planets -- runreport -g GAME_ID
 ```
 
 For running ship automation scripts:
 ```sh
-cabal run planets -- script -s GAME_ID
+cabal run planets -- runscript -s GAME_ID
 ```
 
 Replace `GAME_ID` with your Planets.nu game identifier (e.g., 643520).
