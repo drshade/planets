@@ -261,7 +261,7 @@ fetch url = do
             P.error $ "Non-200 response returned... implement this! -> " ++ body
         else do
             let body :: String = LChar8.unpack $ responseBody resp
-            putStrLn $ "Response: " ++ body
+            -- putStrLn $ "Response: " ++ body
             -- First check if it's an error by decoding the response
             let errorResponse = decode (LChar8.pack body) :: Maybe ErrorResponse
             case errorResponse of
@@ -360,10 +360,6 @@ data ShipUpdate
 
 makeLenses ''ShipUpdate
 
--- defaultShipUpdate :: Int -> ShipUpdate
--- defaultShipUpdate _id = ShipUpdate _id Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-
-
 {-
 Id:::4
 |||FriendlyCode:::563
@@ -439,14 +435,10 @@ data PlanetUpdate
 
 makeLenses ''PlanetUpdate
 
--- defaultPlanetUpdate :: Int -> PlanetUpdate
--- defaultPlanetUpdate _id = PlanetUpdate _id Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-
 data TransferTargetType = PlanetTransferTarget
 
 transferTargetType :: TransferTargetType -> Int
 transferTargetType PlanetTransferTarget = 1
-
 
 instance Show ShipUpdate where
     show (ShipUpdate id' name neu dur tri mol mc sup clans ammo tneu tdur ttri tmol tmc tsup tclans tammo ttargetid ttargettype targetx targety fc warp mission m1target m2target podhullid podcargo enemy waypoints readystatus) =
@@ -524,7 +516,6 @@ instance Show PlanetUpdate where
         <> build "TargetY" targety
         <> build "DevelopmentLevel" developmentlevel
         where
-            build :: Show a => String -> a -> String
             build key x = "|||" <> key <> ":::" <> show x
             buildString key v = "|||" <> key <> ":::" <> v
 
