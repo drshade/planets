@@ -51,7 +51,7 @@ readCredential = do
 printSummaryReport :: String -> IO ()
 printSummaryReport gameid = do
 
-    -- My test games
+    -- My test games, oh also my test games, except for those that aren't mine
     -- Test game            = 643520
     -- Sector 7777          = 643510
     -- Lets try this thing  = 643598
