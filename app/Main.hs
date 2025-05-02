@@ -3,21 +3,20 @@
 module Main where
 
 import           Api                               (currentTurn, login, update)
-import           Calcs                             (production)
+import           Calcs                             (cargoUsed, production,
+                                                    totalResources)
 import           Control.Monad                     (foldM, void)
 import           Data.Data                         (Data)
 import           Data.Map                          (empty)
 import           Data.Maybe                        (fromMaybe)
-import           Model                             (cargoUsed, getPlanetById,
-                                                    getShipById, hullCargo,
-                                                    myPlanets, myShips,
-                                                    planetName,
+import           Model                             (getPlanetById, getShipById,
+                                                    hullCargo, myPlanets,
+                                                    myShips, planetName,
                                                     planetNativeType,
                                                     planetResources,
                                                     resourcesClans, shipAmmo,
                                                     shipHull, shipId, shipName,
-                                                    shipResources,
-                                                    totalResources)
+                                                    shipResources)
 import qualified Model                             as Model (fromLoadTurnResponse)
 import           MyScripts                         (GameDef (GameDef), scripts)
 import           Optics.Operators                  ((^.))

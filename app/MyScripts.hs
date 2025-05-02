@@ -4,9 +4,6 @@ import           Model
 import           Scripting.PlanetScript (PlanetScript)
 import           Scripting.ShipScript
 
-(==>) :: id -> s -> (id, s)
-(==>) id' script' = (id', script')
-
 type ShipScriptAssignment = (ShipId, ShipScript)
 type PlanetScriptAssignment = (PlanetId, PlanetScript)
 
@@ -20,6 +17,19 @@ GameDef id' ships planets ^-> assignment = GameDef id' (assignment : ships) plan
 
 (@->) :: GameDef -> PlanetScriptAssignment -> GameDef
 GameDef id' ships planets @-> assignment = GameDef id' ships (assignment : planets)
+
+(==>) :: id -> s -> (id, s)
+(==>) id' script' = (id', script')
+
+-- to glue scripts together
+(>>=>) :: Monad m => m () -> m () -> m ()
+(>>=>) a b = a >>= const b
+
+-- TBD: Figure out the precedence to write this:
+-- @-> (2 ==> buildMaxMinesScript >>=> setTaxRate)
+-- infixl 5 ==>
+-- infixl 6 @->
+-- infixl 5 >>=>
 
 scripts :: [GameDef]
 scripts =
@@ -47,6 +57,6 @@ scripts =
         -- ^-> (3 ==> collectAndDropScript "Kapteyn's Planet" homeplanet)
         -- ^-> (4 ==> collectAndDropScript "Serada 9" homeplanet)
         -- @-> (5 ==> buildOneOfEachScript)
-        -- @-> (2 ==> buildMaxMinesScript)
+        @-> (2 ==> (buildMaxMinesScript >>=> setTaxRate))
 
     :[]

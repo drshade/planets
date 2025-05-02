@@ -1,13 +1,17 @@
 module Calcs where
-import           Model  (Minerals (..), NativeType (..), Planet, Race (..),
-                         Resources (..), mineralsDuranium, mineralsMolybdenum,
-                         mineralsNeutronium, mineralsTritanium,
-                         planetColonistTaxRate, planetDensityMinerals,
-                         planetFactories, planetGroundMinerals, planetMines,
-                         planetNativeClans, planetNativeTaxRate,
-                         planetNativeTaxValue, planetNativeType,
-                         planetResources, resourcesClans)
-import           Optics (Lens', (^.))
+import           Data.List (sortOn)
+import           Model     (HasPosition, HasResources, Minerals (..),
+                            NativeType (..), Planet, Race (..), Resources (..),
+                            Ship, mineralsDuranium, mineralsMolybdenum,
+                            mineralsNeutronium, mineralsTritanium,
+                            planetColonistTaxRate, planetDensityMinerals,
+                            planetFactories, planetGroundMinerals, planetMines,
+                            planetNativeClans, planetNativeTaxRate,
+                            planetNativeTaxValue, planetNativeType,
+                            planetResources, position, resources,
+                            resourcesClans, resourcesMinerals,
+                            resourcesSupplies, shipResources)
+import           Optics    (Lens', (^.))
 
 production :: Planet -> Resources
 production planet =
@@ -75,3 +79,35 @@ torpsForMinefieldSize race techlevel lys =
         minesRequired = fromIntegral lys * (3.1416 :: Double) ** 2
      in ceiling $ minesRequired * 10 / (fromIntegral minesPerTorp)
 
+-- Manhattan distance - not ideal
+manhattanDistance :: HasPosition a => HasPosition b => a -> b -> Int
+manhattanDistance p1 p2 =
+    let (x1, y1) = position p1
+        (x2, y2) = position p2
+     in abs (x1 - x2) + abs (y1 - y2)
+
+-- Euclidean distance
+distance :: HasPosition a => HasPosition b => a -> b -> Double
+distance p1 p2 =
+    let (x1, y1) = position p1
+        (x2, y2) = position p2
+     in sqrt $ fromIntegral ((x1 - x2) ^ (2 :: Int) + (y1 - y2) ^ (2 :: Int))
+
+-- Stuff within a certain range within range and return sorted by distance
+withinRange :: HasPosition a => [a] -> a -> Double -> [a]
+withinRange points point range =
+    sortOn (\a -> distance point a)
+  $ filter (\p -> let d = distance p point in d > 0 && d < range)
+  $ points
+
+totalResources :: HasResources a => [a] -> Resources
+totalResources =
+    foldl (\acc e -> acc <> resources e) mempty
+
+cargoUsed :: Ship -> Int
+cargoUsed ship =
+    ship ^. shipResources ^. resourcesMinerals ^. mineralsMolybdenum +
+    ship ^. shipResources ^. resourcesMinerals ^. mineralsDuranium +
+    ship ^. shipResources ^. resourcesMinerals ^. mineralsTritanium +
+    ship ^. shipResources ^. resourcesSupplies +
+    ship ^. shipResources ^. resourcesClans

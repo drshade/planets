@@ -12,7 +12,7 @@ A command-line utility for Planets.nu that helps you manage resources and automa
 
 ## Ship Automation Scripts
 
-The tool includes a powerful scripting system that allows you to automate ship operations. Scripts are defined in `app/Scripts.hs` and attached to specific ships by their ID.
+The tool includes a powerful scripting system that allows you to automate ship operations. Scripts are defined in `app/MyScripts.hs` and attached to specific ships by their ID.
 
 ### Example Ship Scripts
 
@@ -24,9 +24,9 @@ This script automates the process of collecting megacredits from one planet and 
 collectAndDropScript :: PlanetName -> PlanetName -> ShipScript
 collectAndDropScript fromPlanet toPlanet = do
     flyTo toPlanet
-    pickup Max Mc
-    flyTo fromPlanet
     dropOff Max Mc
+    flyTo fromPlanet
+    pickUp Max Mc
     flyTo toPlanet
 ```
 
@@ -46,8 +46,8 @@ coloniseScript homeplanet = do
     -- Get the ship (this script is attached to)
     ship <- getShip
 
-    -- Fly to nearest unowned planet
-    nearestPlanet <- minimumBy (\p1 p2 -> compare (distance ship p1) (distance ship p2))
+    -- Find and fly to nearest unowned planet
+    nearestPlanet <- minimumBy (compare `on` distance ship)
                         <$> filter (\p -> p ^. planetOwnerId == 0)
                         <$> getPlanets
     flyTo (nearestPlanet ^. planetName)
@@ -63,46 +63,82 @@ coloniseScript homeplanet = do
 
 #### 3. Adaptive Colonization
 
-Of course you might want to base your calculations on the capacity of your ship cargo, and so you could do this like the following:
+Of course you might want to base your calculations on the capacity of your ship cargo, and so you could do these calcs quite easily too by inspecting your own ship's hull capacity:
 
 ```haskell
-coloniseWithRatiosScript :: PlanetName -> ShipScript
-coloniseWithRatiosScript homeplanet = do
-    flyTo homeplanet
-    
     ship <- getShip
 
-    pickup (Exact $ ship ^. shipHull ^. hullCargo * 60 `div` 100) Clans
-    pickup (Exact $ ship ^. shipHull ^. hullCargo * 40 `div` 100) Supplies
-    pickup (Exact 400) Mc
-    pickup (Exact 100) Neu
+    -- Determine your total cargo capacity
+    let totalCargoCapacity = ship ^. shipHull ^. hullCargo
 
-    -- Fly to nearest unowned planet
-    nearestPlanet <- minimumBy (\p1 p2 -> compare (distance ship p1) (distance ship p2))
-                        <$> filter (\p -> p ^. planetOwnerId == 0)
-                        <$> getPlanets
-    flyTo (nearestPlanet ^. planetName)
-
-    -- Drop off resources
-    dropOff Max Clans
-    dropOff Max Supplies
-    dropOff Max Mc
-
-    -- Fly back home
-    flyTo homeplanet
+    -- Pickup upto 60% of that capacity in Clans
+    pickup (Exact $ totalCargoCapacity * 60 `div` 100) Clans
 ```
 
-## Assigning Scripts to Ships
-
-To assign scripts to ships, edit the `scripts` list in `app/Scripts.hs`:
+If you want to get even fancier - why not calculate how much capacity you have free rather that total?
 
 ```haskell
-scripts :: [(ShipId, ShipScript)]
+    ship <- getShip
+
+    -- Determine your total cargo capacity
+    let freeCapacity = ship ^. shipHull ^. hullCargo - cargoUsed ship
+
+    -- Pickup upto 100% of your free capacity in Clans
+    pickup (Exact $ freeCapacity) Clans
+```
+
+## Planet automation scripts
+
+You can build and assign Planet Scripts too! For example:
+
+```haskell
+-- A script to build a single mine, factory and defense every turn
+buildOneOfEachScript :: PlanetScript
+buildOneOfEachScript = do
+    buildFactories (Exact 1)
+    buildMines (Exact 1)
+    buildDefenses (Exact 1)
+```
+
+Or set native tax rate to 5%:
+
+```haskell
+setTaxRate :: PlanetScript
+setTaxRate = setNativeTaxRate 5
+```
+
+## Assigning Scripts to Ships and Planets
+
+To assign scripts to ships in `app/MyScripts.hs`:
+
+```haskell
+scripts :: [GameDef]
 scripts =
-    [ (1, coloniseWithRatiosScript "Fred")
-    , (7, collectAndDropScript "Eeeeediot" "Van Maanan's Planet")
-    , (6, collectAndDropScript "Forel" "Van Maanan's Planet")
-    ]
+    let homeplanet = "Hiperborealia"
+     in
+    game 644461 -- <- specify the game id!
+        -- Ship id 1 assigned the patrolScript with various parameters
+        ^-> (1 ==> patrolScript [homeplanet, "Phorax", "Rsky Business"])
+        -- Ship id 2 assigned the coloniseScript with various parameters
+        ^-> (2 ==> coloniseScript homeplanet)
+        -- etc.
+        ^-> (3 ==> collectAndDropScript "Kapteyn's Planet" homeplanet)
+        ^-> (4 ==> collectAndDropScript "Serada 9" homeplanet)
+        
+        -- Planet id 5 assigned the buildOneOfEachScript
+        @-> (5 ==> buildOneOfEachScript)
+        -- and so on
+        @-> (6 ==> setTaxRate)
+
+    :[]
+```
+
+## Composition
+
+Of course all planet and ship scripts are composable, so you can combine and mix 'em up however you like:
+
+```haskell
+buildOneOfEachScript >>=> setTaxRate
 ```
 
 ## How the Scripting Works
@@ -115,7 +151,6 @@ Each script continues from the appropriate point based on the current state of t
 
 Planned features include:
 
-- Planet scripts! Automate the building of mines / factories / tax rates / etc.
 - Planet Production Potential: More detailed analysis of maximum production capabilities
 - Resource Forecasting: Estimate future resources based on ships en route and production
 - Strategic Recommendations: Optimizing resource distribution
@@ -148,12 +183,12 @@ password
 
 For resource reporting:
 ```sh
-cabal run planets -- report -g GAME_ID
+cabal run planets -- runproductionreport -g GAME_ID
 ```
 
 For running ship automation scripts:
 ```sh
-cabal run planets -- script -s GAME_ID
+cabal run planets -- runscript
 ```
 
 Replace `GAME_ID` with your Planets.nu game identifier (e.g., 643520).
