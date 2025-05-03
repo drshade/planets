@@ -9,10 +9,10 @@ import           Control.Monad                     (foldM, void)
 import           Data.Data                         (Data)
 import           Data.Map                          (empty)
 import           Data.Maybe                        (fromMaybe)
-import           Model                             (Gamestate, cargoUsed,
-                                                    getPlanetById, getShipById,
-                                                    hullCargo, myPlanets,
-                                                    myShips, planetName,
+import           Model                             (Gamestate, getPlanetById,
+                                                    getShipById, hullCargo,
+                                                    myPlanets, myShips,
+                                                    planetName,
                                                     planetNativeType,
                                                     planetResources,
                                                     resourcesClans, shipAmmo,
