@@ -88,6 +88,7 @@ executable planets
                     , astar
                     , cmdargs
                     , pretty-terminal
+                    , directory
 
 
     -- Directories containing source files.

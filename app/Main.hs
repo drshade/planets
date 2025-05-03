@@ -9,9 +9,10 @@ import           Control.Monad                     (foldM, void)
 import           Data.Data                         (Data)
 import           Data.Map                          (empty)
 import           Data.Maybe                        (fromMaybe)
-import           Model                             (getPlanetById, getShipById,
-                                                    hullCargo, myPlanets,
-                                                    myShips, planetName,
+import           Model                             (Gamestate, getPlanetById,
+                                                    getShipById, hullCargo,
+                                                    myPlanets, myShips,
+                                                    planetName,
                                                     planetNativeType,
                                                     planetResources,
                                                     resourcesClans, shipAmmo,
@@ -31,33 +32,30 @@ import           Scripting.Types                   (ScriptEnvironment (..),
 import           System.Console.CmdArgs            (cmdArgsMode, cmdArgsRun,
                                                     help, modes, name, program,
                                                     summary, typ, (&=))
+import           System.Directory                  (getCurrentDirectory)
 import           System.IO.Error                   (tryIOError)
 import           Text.Printf                       (printf)
+
+-- My test games, oh also my test games, except for those that aren't mine
+-- Test game            = 643520
+-- Sector 7777          = 643510
+-- Lets try this thing  = 643598
+-- Westville            = 641474
 
 -- Read from file, first line is username, second line is password
 readCredential :: IO (String, String)
 readCredential = do
     credentials <- tryIOError $ readFile ".credential"
     case credentials of
-        Left _ -> error message
+        Left _ -> do
+            cwd <- getCurrentDirectory
+            error $ "Attempting to read .credential file from working directory: " ++ cwd
         Right contents -> case lines contents of
             username : password : _ -> pure (username, password)
-            _                       -> error message
-    where message = "Expected 2 lines in a file named '.credential'. First line username, second line password."
+            _ -> error "Expected 2 lines in a file named '.credential'. First line username, second line password."
 
-printSummaryReport :: String -> IO ()
-printSummaryReport gameid = do
-
-    -- My test games
-    -- Test game            = 643520
-    -- Sector 7777          = 643510
-    -- Lets try this thing  = 643598
-    -- Westville            = 641474
-
-    (username, password) <- readCredential
-    apikey <- login username password
-    turn <- currentTurn apikey gameid
-    let gamestate = Model.fromLoadTurnResponse turn
+printSummaryReport :: Gamestate -> IO ()
+printSummaryReport gamestate = do
 
     let myPlanets' = myPlanets gamestate
     let myShips' = myShips gamestate
@@ -139,7 +137,10 @@ main = do
     apikey <- login username password
 
     case mode of
-        RunReport gameid -> printSummaryReport gameid
+        RunReport gameid -> do
+            turn <- currentTurn apikey gameid
+            let gamestate = Model.fromLoadTurnResponse turn
+            printSummaryReport gamestate
         RunProductionReport gameid -> do
             turn <- currentTurn apikey gameid
             let gamestate = Model.fromLoadTurnResponse turn
