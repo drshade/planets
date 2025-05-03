@@ -3,7 +3,8 @@
 module Main where
 
 import           Api                               (currentTurn, login, update)
-import           Calcs                             (production)
+import           Calcs                             (cargoUsed, production,
+                                                    totalResources)
 import           Control.Monad                     (foldM, void)
 import           Data.Data                         (Data)
 import           Data.Map                          (empty)
@@ -16,8 +17,7 @@ import           Model                             (Gamestate, cargoUsed,
                                                     planetResources,
                                                     resourcesClans, shipAmmo,
                                                     shipHull, shipId, shipName,
-                                                    shipResources,
-                                                    totalResources)
+                                                    shipResources)
 import qualified Model                             as Model (fromLoadTurnResponse)
 import           MyScripts                         (GameDef (GameDef), scripts)
 import           Optics.Operators                  ((^.))

@@ -1,4 +1,5 @@
 module CommonScripts where
+import           Calcs                  (distance)
 import           Data.Foldable          (minimumBy)
 import           Data.Function          (on)
 import           Model
@@ -90,4 +91,7 @@ buildOneOfEachScript = do
     buildFactories (Exact 1)
     buildMines (Exact 1)
     buildDefenses (Exact 1)
+
+setTaxRate :: PlanetScript
+setTaxRate = setNativeTaxRate 5
 

@@ -11,9 +11,9 @@ data PlanetScriptInstr next
     | BuildMines Amount next
     | BuildFactories Amount next
     | BuildDefenses Amount next
-    -- | BuildStarbase next
-    -- | SetNativeTaxRate Amount next
-    -- | SetColonistTaxRate Amount next
+    | SetNativeTaxRate Int next
+    | SetColonistTaxRate Int next
+    | BuildStarbase next
     -- | GetShips ([Ship] -> next)
     -- | GetPlanets ([Planet] -> next)
     deriving (Functor)
@@ -46,3 +46,11 @@ buildFactories amt = liftF $ BuildFactories amt ()
 buildDefenses :: Amount -> PlanetScriptInstruction ()
 buildDefenses amt = liftF $ BuildDefenses amt ()
 
+setNativeTaxRate :: Int -> PlanetScriptInstruction ()
+setNativeTaxRate amt = liftF $ SetNativeTaxRate amt ()
+
+setColonistTaxRate :: Int -> PlanetScriptInstruction ()
+setColonistTaxRate amt = liftF $ SetColonistTaxRate amt ()
+
+buildStarbase :: PlanetScriptInstruction ()
+buildStarbase = liftF $ BuildStarbase ()

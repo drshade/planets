@@ -24,8 +24,6 @@ type ApiKey = String
 type GameId = String
 type Url = String
 
-type Planets a = IO a
-
 data ErrorResponse = ErrorResponse
     { _errorResponseSuccess :: Bool
     , _errorResponseError   :: String
@@ -248,7 +246,7 @@ data LoadTurnResponse = LoadTurnResponse
 makeLenses ''LoadTurnResponse
 deriveJSON defaultOptions { fieldLabelModifier = fmap toLower . drop (length "_loadturn") } ''LoadTurnResponse
 
-fetch :: FromJSON a => Url -> Planets a
+fetch :: FromJSON a => Url -> IO a
 fetch url = do
     let apiUrl = "http://api.planets.nu"
     req <- parseRequest $ apiUrl ++ url
@@ -274,13 +272,13 @@ fetch url = do
                         Right a  -> pure a
                         Left err -> P.error $ "Failed to parse response: " ++ body ++ "\n-> " ++ err
 
-login :: Username -> Password -> Planets ApiKey
+login :: Username -> Password -> IO ApiKey
 login username password = do
     let url = "/account/login?username=" ++ username ++ "&password=" ++ password
     res :: LoginResponse <- fetch url
     pure $ res ^. loginResponseApiKey
 
-currentTurn :: ApiKey -> GameId -> Planets LoadTurnResponse
+currentTurn :: ApiKey -> GameId -> IO LoadTurnResponse
 currentTurn apikey gameid = do
     let url = "/game/loadturn?apikey=" ++ apikey ++ "&gameid=" ++ gameid ++ "&forsave=true"
     res :: LoadTurnResponse <- fetch url
@@ -519,7 +517,7 @@ instance Show PlanetUpdate where
             build key x = "|||" <> key <> ":::" <> show x
             buildString key v = "|||" <> key <> ":::" <> v
 
-update :: ApiKey -> LoadTurnResponse -> Map Int ShipUpdate -> Map Int PlanetUpdate -> Planets ()
+update :: ApiKey -> LoadTurnResponse -> Map Int ShipUpdate -> Map Int PlanetUpdate -> IO ()
 update apikey loadturn shipUpdates planetUpdates = do
     let params = "?gameid=" <> show (loadturn ^. loadturnRst ^. rstGame ^. gameId)
                  <> "&playerid=" <> show (loadturn ^. loadturnRst ^. rstPlayer ^. playerId)

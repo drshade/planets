@@ -1,12 +1,12 @@
 module Production where
 
+import           Calcs                 (distance, withinRange)
 import           Model                 (Gamestate, Minerals,
                                         NativeType (Amorphous, Bovinoid, Insectoid),
-                                        Planet, Race (..), distance,
-                                        gamestatePlayer, mineralsDuranium,
-                                        mineralsMolybdenum, mineralsNeutronium,
-                                        mineralsTritanium, myPlanets,
-                                        myPlanetsWithBase,
+                                        Planet, Race (..), gamestatePlayer,
+                                        mineralsDuranium, mineralsMolybdenum,
+                                        mineralsNeutronium, mineralsTritanium,
+                                        myPlanets, myPlanetsWithBase,
                                         planetColonistHappiness,
                                         planetColonistHappinessRate,
                                         planetColonistTaxRate,
@@ -20,7 +20,7 @@ import           Model                 (Gamestate, Minerals,
                                         planetResources, planetTemperature,
                                         playerRace, resourcesClans,
                                         resourcesMegaCredits, resourcesMinerals,
-                                        resourcesSupplies, withinRange)
+                                        resourcesSupplies)
 import           Optics                ((^.))
 import           Optics.Lens           (Lens')
 import           System.Console.Pretty (Color (..), color)

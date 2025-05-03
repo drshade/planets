@@ -1,6 +1,5 @@
 module Model where
 import qualified Api
-import           Data.List   (sortOn)
 import           Data.Map    (Map)
 import qualified Data.Map    as Map (fromList, lookup)
 import           Data.Maybe  (fromMaybe, isJust, listToMaybe)
@@ -462,35 +461,3 @@ myShips gamestate =
     let myId = gamestate ^. gamestatePlayer ^. playerId
      in filter (\s -> s ^. shipOwnerId == myId) (gamestate ^. gamestateShips)
 
--- Manhattan distance - not ideal
-manhattanDistance :: HasPosition a => HasPosition b => a -> b -> Int
-manhattanDistance p1 p2 =
-    let (x1, y1) = position p1
-        (x2, y2) = position p2
-     in abs (x1 - x2) + abs (y1 - y2)
-
--- Euclidean distance
-distance :: HasPosition a => HasPosition b => a -> b -> Double
-distance p1 p2 =
-    let (x1, y1) = position p1
-        (x2, y2) = position p2
-     in sqrt $ fromIntegral ((x1 - x2) ^ (2 :: Int) + (y1 - y2) ^ (2 :: Int))
-
--- Stuff within a certain range within range and return sorted by distance
-withinRange :: HasPosition a => [a] -> a -> Double -> [a]
-withinRange points point range =
-    sortOn (\a -> distance point a)
-  $ filter (\p -> let d = distance p point in d > 0 && d < range)
-  $ points
-
-totalResources :: HasResources a => [a] -> Resources
-totalResources =
-    foldl (\acc e -> acc <> resources e) mempty
-
-cargoUsed :: Ship -> Int
-cargoUsed ship =
-    ship ^. shipResources ^. resourcesMinerals ^. mineralsMolybdenum +
-    ship ^. shipResources ^. resourcesMinerals ^. mineralsDuranium +
-    ship ^. shipResources ^. resourcesMinerals ^. mineralsTritanium +
-    ship ^. shipResources ^. resourcesSupplies +
-    ship ^. shipResources ^. resourcesClans

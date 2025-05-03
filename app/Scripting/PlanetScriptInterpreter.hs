@@ -1,12 +1,15 @@
 module Scripting.PlanetScriptInterpreter where
 import           Api                    (PlanetUpdate (..),
+                                         planetUpdateBuildingStarbase,
                                          planetUpdateBuiltDefense,
                                          planetUpdateBuiltFactories,
                                          planetUpdateBuiltMines,
+                                         planetUpdateColonistTaxRate,
                                          planetUpdateDefense,
                                          planetUpdateFactories,
                                          planetUpdateMegaCredits,
                                          planetUpdateMines,
+                                         planetUpdateNativeTaxRate,
                                          planetUpdateSupplies)
 import           Control.Monad.Free     (Free (..))
 import           Control.Monad.RWS      (ask, modify, runRWS, tell)
@@ -41,10 +44,12 @@ modifyPlanetUpdate planet update = do
 
 interpret :: PlanetScriptInstruction a -> ScriptRWS Planet ()
 interpret (Pure _)                    = pure ()
+
 interpret (Free (GetPlanet next))      = do
     ScriptEnvironment _gamestate planet <- ask
     tell ["GetPlanet => " <> planet ^. planetName <> " (id " <> show (planet ^. planetId) <> ")"]
     interpret $ next planet
+
 interpret (Free (Amount resource next)) = do
     ScriptEnvironment _gamestate planet <- ask
     let amount = case resource of
@@ -57,21 +62,25 @@ interpret (Free (Amount resource next)) = do
             Mol      -> planet ^. planetResources ^. resourcesMinerals ^. mineralsMolybdenum
     tell ["Amount " <> show resource <> " => " <> show amount]
     interpret $ next amount
+
 interpret (Free (Mines next)) = do
     ScriptEnvironment _gamestate planet <- ask
     let amount = planet ^. planetMines
     tell ["Mines => " <> show amount]
     interpret $ next amount
+
 interpret (Free (Factories next)) = do
     ScriptEnvironment _gamestate planet <- ask
     let amount = planet ^. planetFactories
     tell ["Factories => " <> show amount]
     interpret $ next amount
+
 interpret (Free (Defenses next)) = do
     ScriptEnvironment _gamestate planet <- ask
     let amount = planet ^. planetDefenses
     tell ["Defenses => " <> show amount]
     interpret $ next amount
+
 interpret (Free (BuildMines amount next)) = do
     ScriptEnvironment _gamestate planet <- ask
 
@@ -144,6 +153,28 @@ interpret (Free (BuildDefenses amount next)) = do
                 & planetUpdateBuiltDefense .~ planetUpdate ^. planetUpdateBuiltDefense + amt
                 & planetUpdateMegaCredits .~ planetUpdate ^. planetUpdateMegaCredits - amt * 10
                 & planetUpdateSupplies .~ planetUpdate ^. planetUpdateSupplies - amt
+        )
+    interpret $ next
+
+interpret (Free (SetNativeTaxRate amount next)) = do
+    ScriptEnvironment _gamestate planet <- ask
+    modifyPlanetUpdate planet (\planetUpdate ->
+            planetUpdate & planetUpdateNativeTaxRate .~ amount
+        )
+    interpret $ next
+
+interpret (Free (SetColonistTaxRate amount next)) = do
+    ScriptEnvironment _gamestate planet <- ask
+    modifyPlanetUpdate planet (\planetUpdate ->
+            planetUpdate & planetUpdateColonistTaxRate .~ amount
+        )
+    interpret $ next
+
+interpret (Free (BuildStarbase next)) = do
+    ScriptEnvironment _gamestate planet <- ask
+    -- TBD: Probably also need to remove the costs of the starbase here... test!
+    modifyPlanetUpdate planet (\planetUpdate ->
+            planetUpdate & planetUpdateBuildingStarbase .~ True
         )
     interpret $ next
 
