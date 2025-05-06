@@ -79,6 +79,13 @@ torpsForMinefieldSize race techlevel lys =
         minesRequired = fromIntegral lys * (3.1416 :: Double) ** 2
      in ceiling $ minesRequired * 10 / (fromIntegral minesPerTorp)
 
+sizeForTorps :: Race -> TorpedoTechLevel -> Int -> Lightyears
+sizeForTorps race techlevel torps =
+    let minesPerTorp = techlevel ^ (2 :: Int) * (case race of Robots -> 4; _ -> 1)
+        mines = fromIntegral torps * fromIntegral minesPerTorp
+     in floor $ mines / (10 * ((3.1416 :: Double) ** 2))
+
+
 -- Manhattan distance - not ideal
 manhattanDistance :: HasPosition a => HasPosition b => a -> b -> Int
 manhattanDistance p1 p2 =
