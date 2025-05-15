@@ -19,7 +19,9 @@ import           Model                             (Gamestate, getPlanetById,
                                                     shipHull, shipId, shipName,
                                                     shipResources)
 import qualified Model                             as Model (fromLoadTurnResponse)
-import           MyScripts                         (GameDef (GameDef), scripts)
+import           MyScripts                         (GameDef (GameDef),
+                                                    ScriptAssignment (PlanetScriptAssignment, ShipScriptAssignment),
+                                                    scripts)
 import           Optics.Operators                  ((^.))
 import           Production                        (productionReport)
 import qualified Scripting.PlanetScriptInterpreter as PlanetScriptInterpreter (restoreAndRun,
@@ -104,24 +106,24 @@ printSummaryReport gamestate = do
     pure ()
 
 data Planets
-    = RunReport { reportGameid :: String }
-    | RunProductionReport { reportGameid :: String }
-    | RunScript { }
+    = RunReport { runReportGameid :: String }
+    | RunProductionReport { runProductionReportGameid :: String }
+    | RunScript { runScriptGameid :: Int }
     deriving (Show, Data)
 
 runReport :: Planets
 runReport = RunReport
-            { reportGameid = "641474" &= name "gameid" &= help "Id of the game" &= typ "GAMEID" }
+            { runReportGameid = "641474" &= name "gameid" &= help "Id of the game" &= typ "GAMEID" }
             &= help "Display summary of planets & ships"
 
 runProductionReport :: Planets
 runProductionReport = RunProductionReport
-            { reportGameid = "641474" &= name "gameid" &= help "Id of the game" &= typ "GAMEID" }
+            { runProductionReportGameid = "641474" &= name "gameid" &= help "Id of the game" &= typ "GAMEID" }
             &= help "Display production report of planets"
 
 runScript :: Planets
 runScript = RunScript
-            { }
+            { runScriptGameid = 641474 &= name "gameid" &= help "Id of the game" &= typ "GAMEID" }
             &= help "Display summary of planets & ships"
 
 main :: IO ()
@@ -145,41 +147,43 @@ main = do
             turn <- currentTurn apikey gameid
             let gamestate = Model.fromLoadTurnResponse turn
             productionReport gamestate
-        RunScript -> do
+        RunScript gameid -> do
             mapM_
-                (\(GameDef gameid shipScripts planetScripts) -> do
-                    putStrLn $ "Running scripts for game " <> show gameid
+                (\(GameDef thisgameid scriptAssignments) -> do
+                    putStrLn $ "Running scripts for game " <> show thisgameid
 
-                    loadturn <- currentTurn apikey (show gameid)
+                    loadturn <- currentTurn apikey (show thisgameid)
                     let gamestate = Model.fromLoadTurnResponse loadturn
 
-                    -- Run the ship scripts
+                    -- Run the scripts
                     (ScriptState shipUpdates planetUpdates)
-                        <- foldM (\state (shipId', shipScript) -> do
-                                let ship = fromMaybe (error $ "Can't find ship! " <> show shipId')
-                                                     (getShipById gamestate shipId')
-                                let environment = ScriptEnvironment gamestate ship
-                                let (log', updates) = ShipScriptInterpreter.restoreAndRun environment state shipScript
-                                putStrLn $ ShipScriptInterpreter.showShipScriptLog ship log'
-                                pure updates
-                            ) (ScriptState empty empty) shipScripts
+                        <- foldM (\state scriptAssignment -> do
+                            case scriptAssignment of
+                                ShipScriptAssignment shipId' shipScript -> do
+                                    -- Get the ship from the gamestate
+                                    let ship = fromMaybe (error $ "Can't find ship! " <> show shipId')
+                                                         (getShipById gamestate shipId')
+                                    let environment = ScriptEnvironment gamestate ship
+                                    let (log', updates) = ShipScriptInterpreter.restoreAndRun environment state shipScript
+                                    putStrLn $ ShipScriptInterpreter.showShipScriptLog ship log'
+                                    pure updates
+                                PlanetScriptAssignment planetId' planetScript -> do
+                                    -- Get the planet from the gamestate
+                                    let planet = fromMaybe (error $ "Can't find planet! " <> show planetId')
+                                                           (getPlanetById gamestate planetId')
+                                    let environment = ScriptEnvironment gamestate planet
+                                    let (log', updates) = PlanetScriptInterpreter.restoreAndRun environment state planetScript
+                                    putStrLn $ PlanetScriptInterpreter.showPlanetScriptLog planet log'
+                                    pure updates
+                            ) (ScriptState empty empty) scriptAssignments
 
-                    -- Run the planet scripts, passing in the same state
-                    (ScriptState shipUpdates' planetUpdates') <- foldM (\state (planetId', planetScript) -> do
-                                let planet = fromMaybe  (error $ "Can't find planet! " <> show planetId')
-                                                        (getPlanetById gamestate planetId')
-                                let environment = ScriptEnvironment gamestate planet
-                                let (log', updates) = PlanetScriptInterpreter.restoreAndRun environment state planetScript
-                                putStrLn $ PlanetScriptInterpreter.showPlanetScriptLog planet log'
-                                pure updates
-                            ) (ScriptState shipUpdates planetUpdates) planetScripts
-
-                    update apikey loadturn shipUpdates' planetUpdates'
+                    update apikey loadturn shipUpdates planetUpdates
                     putStrLn "end"
 
                     pure ()
                 )
-                scripts
+                -- Only for games which match the gameid
+                $ filter (\(GameDef gameid' _) -> gameid == gameid') scripts
 
 
 

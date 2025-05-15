@@ -4,59 +4,27 @@ import           Model
 import           Scripting.PlanetScript (PlanetScript)
 import           Scripting.ShipScript
 
-type ShipScriptAssignment = (ShipId, ShipScript)
-type PlanetScriptAssignment = (PlanetId, PlanetScript)
+data ScriptAssignment
+    = ShipScriptAssignment ShipId ShipScript
+    | PlanetScriptAssignment PlanetId PlanetScript
 
-data GameDef = GameDef Int [ShipScriptAssignment] [PlanetScriptAssignment]
+data GameDef = GameDef Int [ScriptAssignment]
 
-game :: GameId -> GameDef
-game id' = GameDef id' [] []
+game :: GameId -> [ScriptAssignment] -> GameDef
+game id' assignments = GameDef id' assignments
 
-(^->) :: GameDef -> ShipScriptAssignment -> GameDef
-GameDef id' ships planets ^-> assignment = GameDef id' (assignment : ships) planets
+ship :: ShipId -> ShipScript -> ScriptAssignment
+ship id' script' = ShipScriptAssignment id' script'
 
-(@->) :: GameDef -> PlanetScriptAssignment -> GameDef
-GameDef id' ships planets @-> assignment = GameDef id' ships (assignment : planets)
-
-(==>) :: id -> s -> (id, s)
-(==>) id' script' = (id', script')
-
--- to glue scripts together
-(>>=>) :: Monad m => m () -> m () -> m ()
-(>>=>) a b = a >>= const b
-
--- TBD: Figure out the precedence to write this:
--- @-> (2 ==> buildMaxMinesScript >>=> setTaxRate)
--- infixl 5 ==>
--- infixl 6 @->
--- infixl 5 >>=>
+plnt :: PlanetId -> PlanetScript -> ScriptAssignment
+plnt id' script' = PlanetScriptAssignment id' script'
 
 scripts :: [GameDef]
 scripts =
-    -- Westville Game
-    -- game 641474
-    --     ^-> (1 ==> coloniseWithRatiosScript "Fred")
-    --     ^-> (2 ==> coloniseWithRatiosScript "Forel")
-    -- :
+        [ let _homeplanet = "Hiperborealia"
+           in game 644461
+                [ plnt 2 buildMaxMinesScript
+                , ship 1 $ patrolScript ["Hiperborealia", "Phorax", "Rsky Business"]
+                ]
+        ]
 
-    -- Sector 7777 Game
-    -- game 643510
-    --     ^-> (1 ==> coloniseWithRatiosScript "Frank")
-    -- :
-
-    -- Lets try this thing
-    -- game 643598
-
-    -- Basic training game
-    let _homeplanet = "Hiperborealia"
-     in
-
-    game 644461
-        ^-> (1 ==> patrolScript ["Hiperborealia", "Phorax", "Rsky Business"])
-        -- ^-> (1 ==> coloniseScript homeplanet)
-        -- ^-> (3 ==> collectAndDropScript "Kapteyn's Planet" homeplanet)
-        -- ^-> (4 ==> collectAndDropScript "Serada 9" homeplanet)
-        -- @-> (5 ==> buildOneOfEachScript)
-        @-> (2 ==> (buildMaxMinesScript >>=> setTaxRate))
-
-    :[]
