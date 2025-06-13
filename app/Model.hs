@@ -1,5 +1,7 @@
 module Model where
+
 import qualified Api
+
 import           Data.Map    (Map)
 import qualified Data.Map    as Map (fromList, lookup)
 import           Data.Maybe  (fromMaybe, isJust, listToMaybe)
@@ -52,6 +54,12 @@ instance Show Resources where
         "]"
         where pad = printf "%4d"
 
+data Game = Game
+    { _gameId   :: GameId
+    , _gameName :: String
+    , _gameTurn :: Int
+    } deriving (Show)
+
 data Gamestate = Gamestate
     { _gamestateGame     :: Game
     , _gamestatePlayer   :: Player
@@ -62,18 +70,11 @@ data Gamestate = Gamestate
     , _gamestateLoadTurn :: Api.LoadTurnResponse
     } deriving (Show)
 
-data Game = Game
-    { _gameId   :: GameId
-    , _gameName :: String
-    , _gameTurn :: Int
-    } deriving (Show)
-
 data Player = Player
     { _playerId       :: PlayerId
     , _playerUsername :: String
     , _playerRace     :: Race
     } deriving (Show)
-
 
 data Position = Position
     { _positionX :: Int
@@ -208,7 +209,6 @@ makeLenses ''Ship
 makeLenses ''Hull
 makeLenses ''Engine
 makeLenses ''Planet
-
 
 class HasPosition a where
     position :: a -> (Int, Int)

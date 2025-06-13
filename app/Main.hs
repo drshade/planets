@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
@@ -27,6 +28,12 @@ import           Production                        (productionReport)
 import qualified Scripting.PlanetScriptInterpreter as PlanetScriptInterpreter (restoreAndRun,
                                                                                showPlanetScriptLog)
 
+import           Config                            (readCredential)
+import           Mcp                               (McpTool, handleTool)
+import           MCP.Server                        (runMcpServerStdIn)
+import           MCP.Server.Derive
+import           MCP.Server.Types                  (McpServerHandlers (..),
+                                                    McpServerInfo (..))
 import qualified Scripting.ShipScriptInterpreter   as ShipScriptInterpreter (restoreAndRun,
                                                                              showShipScriptLog)
 import           Scripting.Types                   (ScriptEnvironment (..),
@@ -34,8 +41,6 @@ import           Scripting.Types                   (ScriptEnvironment (..),
 import           System.Console.CmdArgs            (cmdArgsMode, cmdArgsRun,
                                                     help, modes, name, program,
                                                     summary, typ, (&=))
-import           System.Directory                  (getCurrentDirectory)
-import           System.IO.Error                   (tryIOError)
 import           Text.Printf                       (printf)
 
 -- My test games, oh also my test games, except for those that aren't mine
@@ -43,18 +48,6 @@ import           Text.Printf                       (printf)
 -- Sector 7777          = 643510
 -- Lets try this thing  = 643598
 -- Westville            = 641474
-
--- Read from file, first line is username, second line is password
-readCredential :: IO (String, String)
-readCredential = do
-    credentials <- tryIOError $ readFile ".credential"
-    case credentials of
-        Left _ -> do
-            cwd <- getCurrentDirectory
-            error $ "Attempting to read .credential file from working directory: " ++ cwd
-        Right contents -> case lines contents of
-            username : password : _ -> pure (username, password)
-            _ -> error "Expected 2 lines in a file named '.credential'. First line username, second line password."
 
 printSummaryReport :: Gamestate -> IO ()
 printSummaryReport gamestate = do
@@ -109,6 +102,7 @@ data Planets
     = RunReport { runReportGameid :: String }
     | RunProductionReport { runProductionReportGameid :: String }
     | RunScript { runScriptGameid :: Int }
+    | RunMcp
     deriving (Show, Data)
 
 runReport :: Planets
@@ -126,10 +120,15 @@ runScript = RunScript
             { runScriptGameid = 641474 &= name "gameid" &= help "Id of the game" &= typ "GAMEID" }
             &= help "Display summary of planets & ships"
 
+runMcp :: Planets
+runMcp = RunMcp
+            { }
+            &= help "Run the MCP server"
+
 main :: IO ()
 main = do
     mode <- cmdArgsRun $ cmdArgsMode
-                    (modes [runReport, runProductionReport, runScript]
+                    (modes [runReport, runProductionReport, runScript, runMcp]
                         &= help "Planets tool"
                         &= program "planets"
                         &= summary "Planets Tool v0.1 (by drshade)"
@@ -184,6 +183,19 @@ main = do
                 )
                 -- Only for games which match the gameid
                 $ filter (\(GameDef gameid' _) -> gameid == gameid') scripts
+        RunMcp -> do
+            let tools = $(deriveToolHandler ''McpTool 'handleTool)
+             in runMcpServerStdIn
+                    McpServerInfo
+                        { serverName = "Planets.nu MCP Server"
+                        , serverVersion = "0.1.0"
+                        , serverInstructions = "Tools to fetch information about a planets.nu game (VGAPlanets)"
+                        }
+                    McpServerHandlers
+                        { prompts = Nothing
+                        , resources = Nothing
+                        , tools = Just tools
+                        }
 
 
 
