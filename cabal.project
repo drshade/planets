@@ -1,0 +1,5 @@
+packages: .
+          /Users/tom/repo/haskell-mcp-server
+
+-- Using allow-newer in case version bounds don't match
+allow-newer: mcp-server

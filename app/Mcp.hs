@@ -12,13 +12,39 @@ import           Api                        (currentTurn, login)
 import           Config                     (readCredential)
 import           Data.Aeson                 (decode, encode)
 import qualified Data.ByteString.Lazy       as LBS
-import qualified Data.ByteString.Lazy.Char8 as LChar8 (pack, unpack)
 import qualified Data.Text                  as T
-import qualified GHC.IO.Device              as LBS
+import           Guide.Beginner             (beginnerGuide)
+import           Guide.Combat               (combatGuide)
+import           Guide.Economics            (economicsGuide)
+import           Guide.FriendlyCodes        (friendlyCodesGuide)
+import           Guide.Homeworlds           (homeworldsGuide)
+import           Guide.Minefields           (minefieldsGuide)
+import           Guide.Navigation           (navigationGuide)
+import           Guide.Overall              (gameGuideContent)
+import           Guide.Races                (racesGuide)
+import           Guide.Ships                (shipsGuide)
+import           Guide.Starbases            (starbasesGuide)
+import           Guide.Victory              (victoryGuide)
 import           MCP.Server
 import           Model
+import           Network.URI                (URI)
 import           Optics
 import           System.IO.Error            (tryIOError)
+
+data McpResource
+    = GameGuide
+    | RacesGuide
+    | ShipsGuide
+    | MinefieldsGuide
+    | EconomicsGuide
+    | StarbasesGuide
+    | CombatGuide
+    | NavigationGuide
+    | FriendlyCodesGuide
+    | VictoryGuide
+    | BeginnerGuide
+    | HomeworldsGuide
+    deriving (Show, Eq)
 
 data McpTool
     = GetGameProperties
@@ -82,6 +108,43 @@ handleTool (GetShips {..}) = do
     gamestate <- getGamestate
     let ships = filter (\ship -> insideCircle x y radius (ship ^. shipPosition) ) $ gamestate ^. gamestateShips
     pure $ ContentText $ T.pack $ show ships
+
+handleResource :: URI -> McpResource -> IO ResourceContent
+handleResource uri GameGuide = do
+    pure $ ResourceText uri "text/plain" $ T.pack gameGuideContent
+
+handleResource uri RacesGuide = do
+    pure $ ResourceText uri "text/plain" $ T.pack racesGuide
+
+handleResource uri ShipsGuide = do
+    pure $ ResourceText uri "text/plain" $ T.pack shipsGuide
+
+handleResource uri MinefieldsGuide = do
+    pure $ ResourceText uri "text/plain" $ T.pack minefieldsGuide
+
+handleResource uri EconomicsGuide = do
+    pure $ ResourceText uri "text/plain" $ T.pack economicsGuide
+
+handleResource uri StarbasesGuide = do
+    pure $ ResourceText uri "text/plain" $ T.pack starbasesGuide
+
+handleResource uri CombatGuide = do
+    pure $ ResourceText uri "text/plain" $ T.pack combatGuide
+
+handleResource uri NavigationGuide = do
+    pure $ ResourceText uri "text/plain" $ T.pack navigationGuide
+
+handleResource uri FriendlyCodesGuide = do
+    pure $ ResourceText uri "text/plain" $ T.pack friendlyCodesGuide
+
+handleResource uri VictoryGuide = do
+    pure $ ResourceText uri "text/plain" $ T.pack victoryGuide
+
+handleResource uri BeginnerGuide = do
+    pure $ ResourceText uri "text/plain" $ T.pack beginnerGuide
+
+handleResource uri HomeworldsGuide = do
+    pure $ ResourceText uri "text/plain" $ T.pack homeworldsGuide
 
 insideCircle :: Int -> Int -> Int -> Position -> Bool
 insideCircle x y radius pos =

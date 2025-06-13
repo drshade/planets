@@ -1,5 +1,5 @@
 # Build stage
-FROM haskell:9.10 AS builder
+FROM haskell:9.12 AS builder
 
 RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
@@ -26,7 +26,7 @@ RUN cabal build all
 RUN cabal install exe:planets --installdir=/usr/local/bin
 
 # Runtime stage
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 RUN apt-get update && \
     apt-get install -y \

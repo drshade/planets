@@ -29,7 +29,8 @@ import qualified Scripting.PlanetScriptInterpreter as PlanetScriptInterpreter (r
                                                                                showPlanetScriptLog)
 
 import           Config                            (readCredential)
-import           Mcp                               (McpTool, handleTool)
+import           Mcp                               (McpResource, McpTool,
+                                                    handleResource, handleTool)
 import           MCP.Server                        (runMcpServerStdIn)
 import           MCP.Server.Derive
 import           MCP.Server.Types                  (McpServerHandlers (..),
@@ -134,19 +135,22 @@ main = do
                         &= summary "Planets Tool v0.1 (by drshade)"
                     )
 
-    (username, password) <- readCredential
-    apikey <- login username password
-
     case mode of
         RunReport gameid -> do
+            (username, password) <- readCredential
+            apikey <- login username password
             turn <- currentTurn apikey gameid
             let gamestate = Model.fromLoadTurnResponse turn
             printSummaryReport gamestate
         RunProductionReport gameid -> do
+            (username, password) <- readCredential
+            apikey <- login username password
             turn <- currentTurn apikey gameid
             let gamestate = Model.fromLoadTurnResponse turn
             productionReport gamestate
         RunScript gameid -> do
+            (username, password) <- readCredential
+            apikey <- login username password
             mapM_
                 (\(GameDef thisgameid scriptAssignments) -> do
                     putStrLn $ "Running scripts for game " <> show thisgameid
@@ -185,6 +189,7 @@ main = do
                 $ filter (\(GameDef gameid' _) -> gameid == gameid') scripts
         RunMcp -> do
             let tools = $(deriveToolHandler ''McpTool 'handleTool)
+            let resources = $(deriveResourceHandler ''McpResource 'handleResource)
              in runMcpServerStdIn
                     McpServerInfo
                         { serverName = "Planets.nu MCP Server"
@@ -193,7 +198,7 @@ main = do
                         }
                     McpServerHandlers
                         { prompts = Nothing
-                        , resources = Nothing
+                        , resources = Just resources
                         , tools = Just tools
                         }
 
