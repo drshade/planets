@@ -70,6 +70,7 @@ executable planets
     Guide.Combat
     Guide.Economics
     Guide.FriendlyCodes
+    Guide.FullGuide
     Guide.Homeworlds
     Guide.Minefields
     Guide.Navigation

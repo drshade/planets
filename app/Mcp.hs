@@ -8,28 +8,29 @@
 
 module Mcp where
 
-import           Api                        (currentTurn, login)
-import           Config                     (readCredential)
-import           Data.Aeson                 (decode, encode)
-import qualified Data.ByteString.Lazy       as LBS
-import qualified Data.Text                  as T
-import           Guide.Beginner             (beginnerGuide)
-import           Guide.Combat               (combatGuide)
-import           Guide.Economics            (economicsGuide)
-import           Guide.FriendlyCodes        (friendlyCodesGuide)
-import           Guide.Homeworlds           (homeworldsGuide)
-import           Guide.Minefields           (minefieldsGuide)
-import           Guide.Navigation           (navigationGuide)
-import           Guide.Overall              (gameGuideContent)
-import           Guide.Races                (racesGuide)
-import           Guide.Ships                (shipsGuide)
-import           Guide.Starbases            (starbasesGuide)
-import           Guide.Victory              (victoryGuide)
+import           Api                  (currentTurn, login)
+import           Config               (readCredential)
+import           Data.Aeson           (decode, encode)
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Text            as T
+import           Guide.Beginner       (beginnerGuide)
+import           Guide.Combat         (combatGuide)
+import           Guide.Economics      (economicsGuide)
+import           Guide.FriendlyCodes  (friendlyCodesGuide)
+import           Guide.FullGuide      (fullGameGuideContent)
+import           Guide.Homeworlds     (homeworldsGuide)
+import           Guide.Minefields     (minefieldsGuide)
+import           Guide.Navigation     (navigationGuide)
+import           Guide.Overall        (gameGuideContent)
+import           Guide.Races          (racesGuide)
+import           Guide.Ships          (shipsGuide)
+import           Guide.Starbases      (starbasesGuide)
+import           Guide.Victory        (victoryGuide)
 import           MCP.Server
 import           Model
-import           Network.URI                (URI)
+import           Network.URI          (URI)
 import           Optics
-import           System.IO.Error            (tryIOError)
+import           System.IO.Error      (tryIOError)
 
 data McpResource
     = GameGuide
@@ -48,6 +49,7 @@ data McpResource
 
 data McpTool
     = GetGameProperties
+    | GetGameGuide
     | GetMyPlanets
     | GetMyShips
     | GetPlanets { x :: Int, y :: Int, radius :: Int }
@@ -108,6 +110,9 @@ handleTool (GetShips {..}) = do
     gamestate <- getGamestate
     let ships = filter (\ship -> insideCircle x y radius (ship ^. shipPosition) ) $ gamestate ^. gamestateShips
     pure $ ContentText $ T.pack $ show ships
+
+handleTool GetGameGuide = do
+    pure $ ContentText $ T.pack fullGameGuideContent
 
 handleResource :: URI -> McpResource -> IO ResourceContent
 handleResource uri GameGuide = do
