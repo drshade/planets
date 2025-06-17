@@ -29,9 +29,10 @@ import qualified Scripting.PlanetScriptInterpreter as PlanetScriptInterpreter (r
                                                                                showPlanetScriptLog)
 
 import           Config                            (readCredential)
-import           Mcp                               (McpResource, McpTool,
+import           Mcp                               (McpPrompt, McpResource,
+                                                    McpTool, handlePrompt,
                                                     handleResource, handleTool)
-import           MCP.Server                        (runMcpServerStdIn)
+import           MCP.Server                        (runMcpServerStdio)
 import           MCP.Server.Derive
 import           MCP.Server.Types                  (McpServerHandlers (..),
                                                     McpServerInfo (..))
@@ -190,18 +191,16 @@ main = do
         RunMcp -> do
             let tools = $(deriveToolHandler ''McpTool 'handleTool)
             let resources = $(deriveResourceHandler ''McpResource 'handleResource)
-             in runMcpServerStdIn
+            let prompts = $(derivePromptHandler ''McpPrompt 'handlePrompt)
+             in runMcpServerStdio
                     McpServerInfo
                         { serverName = "Planets.nu MCP Server"
                         , serverVersion = "0.1.0"
                         , serverInstructions = "Tools to fetch information about a planets.nu game (VGAPlanets)"
                         }
                     McpServerHandlers
-                        { prompts = Nothing
+                        { prompts = Just prompts
                         , resources = Just resources
                         , tools = Just tools
                         }
-
-
-
 
